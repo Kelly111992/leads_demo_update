@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the CRM system (admin or agent).",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The Firebase Auth UID." },
+        "name": { "type": "string", "description": "The user's full name." },
+        "email": { "type": "string", "format": "email", "description": "The user's email address." },
+        "role": { "type": "string", "enum": ["admin", "agent"], "description": "The user's role." },
+        "status": { "type": "string", "enum": ["active", "inactive"], "description": "The user's status." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user was created." }
+      },
+      "required": ["uid", "name", "email", "role", "status", "createdAt"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "A potential customer from an ad campaign.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The lead's name." },
+        "phone": { "type": "string", "description": "The lead's phone number." },
+        "source": { "type": "string", "enum": ["whatsapp", "facebook", "instagram", "other"], "description": "Where the lead came from." },
+        "status": { "type": "string", "enum": ["new", "assigned", "in_progress", "closed_won", "closed_lost"], "description": "The current stage of the lead." },
+        "assigneeId": { "type": "string", "description": "The UID of the agent assigned to this lead." },
+        "tags": { "type": "array", "items": { "type": "string" }, "description": "Tags associated with the lead." },
+        "notes": { "type": "string", "description": "Internal notes about the lead." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the lead was created." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the lead was last updated." }
+      },
+      "required": ["name", "phone", "source", "status", "createdAt", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A message exchanged with a lead.",
+      "type": "object",
+      "properties": {
+        "leadId": { "type": "string", "description": "The ID of the lead this message belongs to." },
+        "senderId": { "type": "string", "description": "The UID of the sender, or 'client' if from the lead." },
+        "content": { "type": "string", "description": "The message content." },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the message was sent." }
+      },
+      "required": ["leadId", "senderId", "content", "timestamp"]
+    },
+    "Tag": {
+      "title": "Tag",
+      "description": "A tag that can be applied to leads.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The tag name." },
+        "color": { "type": "string", "description": "The tag color (hex code or tailwind class)." }
+      },
+      "required": ["name", "color"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles."
+    },
+    "/leads/{leadId}": {
+      "schema": { "$ref": "#/entities/Lead" },
+      "description": "Stores lead information."
+    },
+    "/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Stores messages for all leads."
+    },
+    "/tags/{tagId}": {
+      "schema": { "$ref": "#/entities/Tag" },
+      "description": "Stores available tags."
+    }
+  }
+}

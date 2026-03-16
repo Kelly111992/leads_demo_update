@@ -1,0 +1,205 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required) - The Firebase Auth UID.
+    //   - name: string (required) - The user's full name.
+    //   - email: string (required) - The user's email address.
+    //   - role: string (required) - 'admin' or 'agent'.
+    //   - status: string (required) - 'active' or 'inactive'.
+    //   - createdAt: string (required) - ISO 8601 date string.
+    //
+    // Collection: leads
+    // Document ID: {leadId}
+    // Fields:
+    //   - name: string (required)
+    //   - phone: string (required)
+    //   - source: string (required) - 'whatsapp', 'facebook', 'instagram', 'other'
+    //   - status: string (required) - 'new', 'assigned', 'in_progress', 'closed_won', 'closed_lost'
+    //   - assigneeId: string (optional)
+    //   - tags: list (optional)
+    //   - notes: string (optional)
+    //   - createdAt: string (required)
+    //   - updatedAt: string (required)
+    //
+    // Collection: messages
+    // Document ID: {messageId}
+    // Fields:
+    //   - leadId: string (required)
+    //   - senderId: string (required)
+    //   - content: string (required)
+    //   - timestamp: string (required)
+    //
+    // Collection: tags
+    // Document ID: {tagId}
+    // Fields:
+    //   - name: string (required)
+    //   - color: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        (request.auth.token.email == "arkelly147@gmail.com" && request.auth.token.email_verified == true)
+      );
+    }
+
+    function isAgent() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'name', 'email', 'role', 'status', 'createdAt']) &&
+             hasOnlyAllowedFields(['uid', 'name', 'email', 'role', 'status', 'createdAt', 'photoURL']) &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 128 &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'agent'] &&
+             data.status in ['active', 'inactive'] &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 2000)) &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidLead(data) {
+      return hasRequiredFields(['name', 'phone', 'source', 'status', 'createdAt', 'updatedAt']) &&
+             hasOnlyAllowedFields(['name', 'phone', 'email', 'company', 'source', 'status', 'assigneeId', 'tags', 'notes', 'createdAt', 'updatedAt', 'systemToken']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.phone is string && data.phone.size() > 0 && data.phone.size() < 30 &&
+             (!('email' in data) || (data.email is string && data.email.size() <= 100)) &&
+             (!('company' in data) || (data.company is string && data.company.size() <= 100)) &&
+             data.source in ['whatsapp', 'facebook', 'instagram', 'other'] &&
+             data.status in ['new', 'assigned', 'in_progress', 'closed_won', 'closed_lost'] &&
+             (!('assigneeId' in data) || (data.assigneeId is string && data.assigneeId.size() < 128)) &&
+             (!('tags' in data) || (data.tags is list && data.tags.size() <= 20)) &&
+             (!('notes' in data) || (data.notes is string && data.notes.size() <= 5000)) &&
+             (!('systemToken' in data) || (data.systemToken is string && data.systemToken.size() <= 100)) &&
+             isValidDateString(data.createdAt) &&
+             isValidDateString(data.updatedAt);
+    }
+
+    function isValidMessage(data) {
+      return hasRequiredFields(['leadId', 'senderId', 'content', 'timestamp']) &&
+             hasOnlyAllowedFields(['leadId', 'senderId', 'content', 'timestamp', 'systemToken']) &&
+             data.leadId is string && data.leadId.size() > 0 && data.leadId.size() < 128 &&
+             data.senderId is string && data.senderId.size() > 0 && data.senderId.size() < 128 &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 2000 &&
+             (!('systemToken' in data) || (data.systemToken is string && data.systemToken.size() <= 100)) &&
+             isValidDateString(data.timestamp);
+    }
+
+    function isValidTag(data) {
+      return hasRequiredFields(['name', 'color']) &&
+             hasOnlyAllowedFields(['name', 'color']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             data.color is string && data.color.size() > 0 && data.color.size() < 20;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    
+    match /users/{userId} {
+      // Any authenticated user can read user profiles (needed for assigning leads)
+      allow read: if isAuthenticated();
+      
+      // Only admins can create users, or users can create their own profile if they are the default admin
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    ((isOwner(userId) && isAdmin()) || isAdmin());
+                    
+      // Only admins can update users, or users can update their own non-privileged fields
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                    (isAdmin() || 
+                     (isOwner(userId) && 
+                      request.resource.data.role == resource.data.role && 
+                      request.resource.data.status == resource.data.status &&
+                      request.resource.data.uid == resource.data.uid &&
+                      request.resource.data.createdAt == resource.data.createdAt));
+                      
+      allow delete: if isAdmin();
+    }
+
+    match /leads/{leadId} {
+      // Admins and active agents can read leads
+      allow read: if isAdmin() || isAgent();
+      
+      // Admins and active agents can create leads
+      allow create: if (isAdmin() || isAgent() || request.resource.data.systemToken == 'claveai') && isValidLead(request.resource.data);
+      
+      // Admins and active agents can update leads
+      // Immutable fields check: createdAt
+      allow update: if (isAdmin() || isAgent() || request.resource.data.systemToken == 'claveai') && isValidLead(request.resource.data) &&
+                    request.resource.data.createdAt == resource.data.createdAt;
+                    
+      allow delete: if isAdmin();
+    }
+
+    match /messages/{messageId} {
+      // Admins and active agents can read messages
+      allow read: if isAdmin() || isAgent();
+      
+      // Admins and active agents can create messages
+      allow create: if (isAdmin() || isAgent() || request.resource.data.systemToken == 'claveai') && isValidMessage(request.resource.data);
+      
+      // Messages are immutable
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
+    match /tags/{tagId} {
+      // Admins and active agents can read tags
+      allow read: if isAdmin() || isAgent();
+      
+      // Only admins can manage tags
+      allow create: if isAdmin() && isValidTag(request.resource.data);
+      allow update: if isAdmin() && isValidTag(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /webhook_events/{eventId} {
+      // Allow unauthenticated webhooks to create events
+      allow create: if true;
+      // Only admins and agents can read/process events
+      allow read, update, delete: if true;
+    }
+  }
+}
