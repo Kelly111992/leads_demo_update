@@ -17,7 +17,7 @@ async function setupEvolutionWebhook() {
   const API_KEY = '429683C4C977415CAAFCCE10F7D57E11';
   // Use APP_URL if available, otherwise fallback to the dev URL
   const APP_URL = process.env.APP_URL || 'https://ais-pre-2xtjywkq6xgncjind7ujf7-85412012081.us-east1.run.app';
-  const webhookUrl = process.env.NODE_ENV !== "production" 
+  const webhookUrl = process.env.NODE_ENV !== "production"
     ? 'https://smee.io/link-inmobiliario-dev-webhook'
     : `${APP_URL}/api/webhook/evolution`;
 
@@ -45,7 +45,7 @@ async function setupEvolutionWebhook() {
         }
       })
     });
-    
+
     if (response.ok) {
       console.log('Evolution Webhook successfully configured!');
     } else {
@@ -81,7 +81,7 @@ async function startServer() {
     try {
       const payload = req.body || req.query;
       console.log(`Received webhook (${req.method}) from Evolution API:`, JSON.stringify(payload, null, 2));
-      
+
       recentWebhooks.unshift({ method: req.method, payload });
       if (recentWebhooks.length > 20) recentWebhooks.pop();
 
@@ -93,12 +93,12 @@ async function startServer() {
           createdAt: new Date().toISOString(),
           status: 'pending'
         });
-        console.log('Saved webhook event for processing');
+        console.log('✅ Webhook guardado en Firestore (webhook_events)');
       }
 
       res.status(200).json({ status: 'success' });
     } catch (error) {
-      console.error('Error processing webhook:', error);
+      console.error('❌ Error guardando webhook en Firestore:', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
@@ -107,7 +107,7 @@ async function startServer() {
   server.post('/api/messages/send', async (req, res) => {
     try {
       const { phone, text } = req.body;
-      
+
       if (!phone || !text) {
         return res.status(400).json({ error: 'Phone and text are required' });
       }
@@ -164,7 +164,7 @@ async function startServer() {
 
   server.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server running on http://localhost:${PORT}`);
-    
+
     // Automatically configure the webhook on startup
     await setupEvolutionWebhook();
 

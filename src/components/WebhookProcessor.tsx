@@ -10,6 +10,7 @@ export function WebhookProcessor() {
     console.log('WebhookProcessor: Checking user profile', userProfile);
     // Only run the processor if the user is an admin or agent
     if (!userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'agent')) {
+      console.log('WebhookProcessor: 🛑 Detenido. No hay usuario o no tiene rol permitido.', userProfile?.role);
       return;
     }
 
@@ -28,11 +29,12 @@ export function WebhookProcessor() {
 
           try {
             // Mark as processing to prevent duplicate processing
-            await updateDoc(doc(db, 'webhook_events', eventDoc.id), { status: 'processing' });
+            const eventRef = doc(db, 'webhook_events', eventDoc.id);
+            await updateDoc(eventRef, { status: 'processing' });
 
             if ((payload.event === 'messages.upsert' || payload.event === 'MESSAGES_UPSERT') && payload.data) {
               const messageData = payload.data.message || payload.data;
-              
+
               // Ignore messages sent by ourselves
               if (messageData.key?.fromMe) {
                 await deleteDoc(doc(db, 'webhook_events', eventDoc.id));
@@ -47,7 +49,7 @@ export function WebhookProcessor() {
 
               const phone = remoteJid.split('@')[0];
               const pushName = messageData.pushName || phone;
-              
+
               let content = '';
               if (messageData.message?.conversation) {
                 content = messageData.message.conversation;
@@ -102,15 +104,20 @@ export function WebhookProcessor() {
               });
 
               // 3. Delete the processed event
-              await deleteDoc(doc(db, 'webhook_events', eventDoc.id));
+              const eventRefToDelete = doc(db, 'webhook_events', eventDoc.id);
+              await deleteDoc(eventRefToDelete);
             } else {
               // Not a message upsert, just delete it
               await deleteDoc(doc(db, 'webhook_events', eventDoc.id));
             }
           } catch (error) {
-            console.error('Error processing webhook event:', error);
+            console.error('WebhookProcessor: ❌ Error procesando evento:', error);
             // Mark as failed so we can inspect it later
-            await updateDoc(doc(db, 'webhook_events', eventDoc.id), { status: 'failed', error: String(error) });
+            try {
+              await updateDoc(doc(db, 'webhook_events', eventDoc.id), { status: 'failed', error: String(error) });
+            } catch (innerError) {
+              console.error('WebhookProcessor: ❌ Error fatal al intentar marcar como fallido:', innerError);
+            }
           }
         }
       }
