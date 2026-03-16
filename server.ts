@@ -87,18 +87,85 @@ async function startServer() {
 
       // Check if it's a message upsert event
       if ((payload.event === 'messages.upsert' || payload.event === 'MESSAGES_UPSERT') && payload.data) {
+        const messageData = payload.data.message || payload.data;
+
+        // Process message logic directly on server
+        if (!messageData.key?.fromMe) {
+          const remoteJid = messageData.key?.remoteJid;
+          if (remoteJid && !remoteJid.includes('@g.us')) {
+            const phone = remoteJid.split('@')[0];
+            const pushName = messageData.pushName || phone;
+
+            let content = '';
+            if (messageData.message?.conversation) {
+              content = messageData.message.conversation;
+            } else if (messageData.message?.extendedTextMessage?.text) {
+              content = messageData.message.extendedTextMessage.text;
+            } else if (messageData.messageType === 'conversation' || messageData.messageType === 'extendedTextMessage') {
+              content = messageData.message?.text || messageData.text || '[Text Message]';
+            } else {
+              content = `[${messageData.messageType || 'Media/Unsupported Message'}]`;
+            }
+
+            console.log(`Processing message from ${pushName}: ${content}`);
+
+            // 1. Check if lead exists
+            const leadsRef = collection(db, 'leads');
+            const leadQuery = query(leadsRef, where('phone', '==', phone));
+            const querySnapshot = await getDocs(leadQuery);
+
+            let leadId = '';
+            const now = new Date().toISOString();
+
+            if (querySnapshot.empty) {
+              const newLead = {
+                name: pushName,
+                phone: phone,
+                source: 'whatsapp',
+                status: 'new',
+                createdAt: now,
+                updatedAt: now,
+                systemToken: 'claveai'
+              };
+              const docRef = await addDoc(leadsRef, newLead);
+              leadId = docRef.id;
+              console.log(`Created new lead: ${leadId}`);
+            } else {
+              const leadDoc = querySnapshot.docs[0];
+              leadId = leadDoc.id;
+              await updateDoc(doc(db, 'leads', leadId), {
+                updatedAt: now,
+                status: leadDoc.data().status === 'closed_won' || leadDoc.data().status === 'closed_lost' ? 'new' : leadDoc.data().status,
+                systemToken: 'claveai'
+              });
+              console.log(`Updated existing lead: ${leadId}`);
+            }
+
+            // 2. Save the message
+            const messagesRef = collection(db, 'messages');
+            await addDoc(messagesRef, {
+              leadId: leadId,
+              senderId: 'client',
+              content: content,
+              timestamp: now,
+              systemToken: 'claveai'
+            });
+            console.log(`Saved message for lead: ${leadId}`);
+          }
+        }
+
         const eventsRef = collection(db, 'webhook_events');
         await addDoc(eventsRef, {
           payload: payload,
           createdAt: new Date().toISOString(),
-          status: 'pending'
+          status: 'processed'
         });
-        console.log('✅ Webhook guardado en Firestore (webhook_events)');
+        console.log('✅ Webhook procesado y guardado en Firestore');
       }
 
       res.status(200).json({ status: 'success' });
     } catch (error) {
-      console.error('❌ Error guardando webhook en Firestore:', error);
+      console.error('❌ Error procesando webhook:', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
