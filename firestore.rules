@@ -143,8 +143,7 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       
       // Only admins can create users, or users can create their own profile if they are the default admin
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
-                    ((isOwner(userId) && isAdmin()) || isAdmin());
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data);
                     
       // Only admins can update users, or users can update their own non-privileged fields
       allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
