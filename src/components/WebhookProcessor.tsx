@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { collection, query, where, onSnapshot, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, addDoc, updateDoc, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -30,20 +30,27 @@ export function WebhookProcessor() {
           try {
             // Mark as processing to prevent duplicate processing
             const eventRef = doc(db, 'webhook_events', eventDoc.id);
-            await updateDoc(eventRef, { status: 'processing' });
+            console.log('WebhookProcessor: Intentando marcar como procesando:', eventDoc.id);
+
+            // Usamos setDoc con merge: true en lugar de updateDoc para evitar el error "No document to update"
+            // y asegurar que el documento existe antes de intentar actualizarlo.
+            await setDoc(eventRef, { status: 'processing' }, { merge: true });
+            console.log('WebhookProcessor: Marcado como procesando ✅', eventDoc.id);
 
             if ((payload.event === 'messages.upsert' || payload.event === 'MESSAGES_UPSERT') && payload.data) {
               const messageData = payload.data.message || payload.data;
 
               // Ignore messages sent by ourselves
               if (messageData.key?.fromMe) {
-                await deleteDoc(doc(db, 'webhook_events', eventDoc.id));
+                console.log('WebhookProcessor: Ignorando mensaje propio');
+                await deleteDoc(eventRef);
                 continue;
               }
 
               const remoteJid = messageData.key?.remoteJid;
               if (!remoteJid || remoteJid.includes('@g.us')) {
-                await deleteDoc(doc(db, 'webhook_events', eventDoc.id));
+                console.log('WebhookProcessor: Ignorando mensaje de grupo o sin JID');
+                await deleteDoc(eventRef);
                 continue;
               }
 
@@ -61,6 +68,8 @@ export function WebhookProcessor() {
                 content = `[${messageData.messageType || 'Media/Unsupported Message'}]`;
               }
 
+              console.log('WebhookProcessor: Procesando mensaje de:', pushName, 'Contenido:', content);
+
               // 1. Check if lead exists
               const leadsRef = collection(db, 'leads');
               const leadQuery = query(leadsRef, where('phone', '==', phone));
@@ -70,7 +79,7 @@ export function WebhookProcessor() {
               const now = new Date().toISOString();
 
               if (querySnapshot.empty) {
-                // Create new lead
+                console.log('WebhookProcessor: Creando nuevo lead');
                 const newLead = {
                   name: pushName,
                   phone: phone,
@@ -83,7 +92,7 @@ export function WebhookProcessor() {
                 const docRef = await addDoc(leadsRef, newLead);
                 leadId = docRef.id;
               } else {
-                // Update existing lead
+                console.log('WebhookProcessor: Actualizando lead existente');
                 const leadDoc = querySnapshot.docs[0];
                 leadId = leadDoc.id;
                 await updateDoc(doc(db, 'leads', leadId), {
@@ -94,6 +103,7 @@ export function WebhookProcessor() {
               }
 
               // 2. Save the message
+              console.log('WebhookProcessor: Guardando mensaje para lead:', leadId);
               const messagesRef = collection(db, 'messages');
               await addDoc(messagesRef, {
                 leadId: leadId,
@@ -104,17 +114,19 @@ export function WebhookProcessor() {
               });
 
               // 3. Delete the processed event
-              const eventRefToDelete = doc(db, 'webhook_events', eventDoc.id);
-              await deleteDoc(eventRefToDelete);
+              console.log('WebhookProcessor: Borrando evento procesado ✅');
+              await deleteDoc(eventRef);
             } else {
               // Not a message upsert, just delete it
-              await deleteDoc(doc(db, 'webhook_events', eventDoc.id));
+              console.log('WebhookProcessor: Evento no reconocido, borrando');
+              await deleteDoc(eventRef);
             }
           } catch (error) {
             console.error('WebhookProcessor: ❌ Error procesando evento:', error);
             // Mark as failed so we can inspect it later
             try {
-              await updateDoc(doc(db, 'webhook_events', eventDoc.id), { status: 'failed', error: String(error) });
+              const eventRef = doc(db, 'webhook_events', eventDoc.id);
+              await setDoc(eventRef, { status: 'failed', error: String(error) }, { merge: true });
             } catch (innerError) {
               console.error('WebhookProcessor: ❌ Error fatal al intentar marcar como fallido:', innerError);
             }
