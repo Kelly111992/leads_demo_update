@@ -493,10 +493,10 @@ export default function Inbox() {
               <select 
                 value={selectedLead.assignee_id || ''} 
                 onChange={e => handleAssignAgent(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white outline-none"
+                className="w-full bg-[#111] border border-white/10 rounded-lg py-2 px-3 text-sm text-white outline-none"
               >
-                <option value="">Sin asignar</option>
-                {agents.map(a => <option key={a.uid} value={a.uid}>{a.name} {a.last_name || ''}</option>)}
+                <option value="" className="bg-[#111] text-gray-300">Sin asignar</option>
+                {agents.map(a => <option key={a.uid} value={a.uid} className="bg-[#111] text-white">{a.name} {a.last_name || ''}</option>)}
               </select>
             </div>
             <div>

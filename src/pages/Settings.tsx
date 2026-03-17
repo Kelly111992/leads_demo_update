@@ -17,6 +17,7 @@ export default function Settings() {
     instance: '',
     defaultAiEnabled: true
   });
+  const [openaiConfig, setOpenaiConfig] = useState({ apiKey: '' });
 
   useEffect(() => {
     async function fetchConfig() {
@@ -29,6 +30,16 @@ export default function Settings() {
         
         if (data && data.value) {
           setConfig(data.value);
+        }
+
+        const { data: openaiData } = await supabase
+          .from('settings')
+          .select('value')
+          .eq('key', 'openai_api')
+          .single();
+          
+        if (openaiData && openaiData.value) {
+          setOpenaiConfig(openaiData.value);
         }
       } catch (error) {
         console.error("Error fetching config:", error);
@@ -45,7 +56,10 @@ export default function Settings() {
     try {
       const { error } = await supabase
         .from('settings')
-        .upsert([{ key: 'evolution_api', value: config }]);
+        .upsert([
+          { key: 'evolution_api', value: config },
+          { key: 'openai_api', value: openaiConfig }
+        ]);
       
       if (error) throw error;
       setSaveStatus('success');
@@ -162,6 +176,30 @@ export default function Settings() {
             {syncStatus === 'success' && <span className="ml-4 text-xs text-emerald-400">¡Sincronizado con éxito!</span>}
             {syncStatus === 'error' && <span className="ml-4 text-xs text-red-400">Error al sincronizar.</span>}
           </div>
+        </div>
+      </div>
+
+      <div className="glass-panel rounded-2xl p-8 bg-black/20 border border-white/5 space-y-6">
+        <h3 className="text-xl font-semibold text-white">Inteligencia Artificial (Copiloto)</h3>
+        <p className="text-xs text-gray-400">
+          Para que la IA genere respuestas sugeridas, necesitas proporcionar una clave API de OpenAI.
+        </p>
+        <div className="space-y-4">
+          <input 
+            type="password"
+            value={openaiConfig.apiKey} 
+            onChange={e => setOpenaiConfig({...openaiConfig, apiKey: e.target.value})} 
+            placeholder="OpenAI API Key (sk-...)" 
+            className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white" 
+          />
+          <button 
+            onClick={handleSave} 
+            disabled={saving}
+            className="px-6 py-2.5 bg-[#D9A21B] text-black font-bold rounded-xl disabled:opacity-50 hover:bg-[#C59B27] transition-all flex items-center gap-2"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? 'Guardando...' : 'Guardar Configuración'}
+          </button>
         </div>
       </div>
     </div>

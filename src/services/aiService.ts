@@ -1,18 +1,34 @@
 import OpenAI from "openai";
-
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY || '',
-  dangerouslyAllowBrowser: true // Solo si se llama desde el cliente, pero idealmente se llama desde el server
-});
+import { supabase } from "../supabase";
 
 export async function generateSuggestedReplies(messages: any[], leadInfo: any) {
-  if (!process.env.OPENAI_API_KEY) {
-    console.warn("OPENAI_API_KEY is not set");
-    return [];
+  let apiKey = '';
+
+  try {
+    const { data } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'openai_api')
+      .single();
+    if (data?.value?.apiKey) {
+      apiKey = data.value.apiKey;
+    }
+  } catch (error) {
+    console.error("No se pudo obtener la OpenAI API Key de Supabase:", error);
   }
 
+  if (!apiKey) {
+    console.warn("OPENAI_API_KEY no está configurada.");
+    return ["Por favor, configura tu API Key de OpenAI en la sección de Configuración para usar esta función."];
+  }
+
+  const openai = new OpenAI({ 
+    apiKey: apiKey,
+    dangerouslyAllowBrowser: true // Solo si se llama desde el cliente
+  });
+
   const conversationContext = messages.map(m => 
-    `${m.senderId === 'client' ? 'Cliente' : 'Agente'}: ${m.content}`
+    `${m.sender_id === 'client' ? 'Cliente' : 'Agente'}: ${m.content}`
   ).join('\n');
 
   const prompt = `
@@ -52,11 +68,11 @@ export async function generateSuggestedReplies(messages: any[], leadInfo: any) {
       if (parsed.suggestions) return parsed.suggestions;
       if (parsed.replies) return parsed.replies;
       // Si devolvió algo plano como { "1": "...", "2": "..." }
-      return Object.values(parsed).slice(0, 3);
+      return Object.values(parsed).slice(0, 3) as string[];
     }
     return [];
   } catch (error) {
     console.error("Error generating AI suggestions with OpenAI:", error);
-    return [];
+    return ["Debes confirmar que tu OpenAI API key es válida e intentar de nuevo."];
   }
 }
