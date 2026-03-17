@@ -396,10 +396,17 @@ export default function Inbox() {
                   </span>
                 </div>
                 {lead.assignee_id && (
-                  <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
-                    <User className="h-3 w-3" />
-                    {agents.find(a => a.uid === lead.assignee_id)?.name || 'Asignado'}
-                  </span>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
+                    <div className="h-4 w-4 rounded-full bg-[#D9A21B] flex items-center justify-center text-[8px] font-black text-black overflow-hidden flex-shrink-0">
+                      {agents.find(a => a.uid === lead.assignee_id)?.photo_url 
+                        ? <img src={agents.find(a => a.uid === lead.assignee_id)?.photo_url} alt="A" className="h-full w-full object-cover" />
+                        : (agents.find(a => a.uid === lead.assignee_id)?.name || 'V').charAt(0).toUpperCase()
+                      }
+                    </div>
+                    <span className="text-[10px] text-gray-400 font-semibold truncate max-w-[80px]">
+                      {agents.find(a => a.uid === lead.assignee_id)?.name || 'Vendedor'}
+                    </span>
+                  </div>
                 )}
               </div>
             </motion.div>
@@ -458,11 +465,21 @@ export default function Inbox() {
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {messages.map(msg => {
                 const isClient = msg.sender_id === 'client';
+                const assignee = agents.find(a => a.uid === selectedLead.assignee_id);
+                
                 return (
-                  <div key={msg.id} className={`flex ${isClient ? 'justify-start' : 'justify-end'}`}>
+                  <div key={msg.id} className={`flex flex-col ${isClient ? 'items-start' : 'items-end'}`}>
+                    {!isClient && assignee && (
+                      <span className="text-[9px] text-gray-500 mb-1 mr-1 uppercase font-bold tracking-tighter">
+                        {assignee.name}
+                      </span>
+                    )}
                     <div className={`max-w-[70%] rounded-2xl px-4 py-2 text-sm ${isClient ? 'bg-white/10 text-gray-200' : 'bg-gradient-to-br from-[#7A2022] to-[#8B1D1D] text-white'}`}>
                       <p className="whitespace-pre-wrap">{msg.content}</p>
-                      <span className="text-[10px] mt-1 block opacity-50">{msg.timestamp ? format(new Date(msg.timestamp), 'HH:mm', { locale: es }) : ''}</span>
+                      <div className="flex items-center justify-between gap-4 mt-1">
+                        <span className="text-[10px] opacity-50">{msg.timestamp ? format(new Date(msg.timestamp), 'HH:mm', { locale: es }) : ''}</span>
+                        {!isClient && <User className="h-2.5 w-2.5 opacity-30" />}
+                      </div>
                     </div>
                   </div>
                 );

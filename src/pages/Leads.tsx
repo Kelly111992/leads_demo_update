@@ -196,9 +196,14 @@ export default function Leads() {
                   <p className="text-xs text-gray-400 mb-2">{lead.phone}</p>
                   
                   {lead.assignee_id && (
-                    <div className="flex items-center gap-1.5 mb-3 px-2 py-1 rounded bg-white/5 border border-white/5 w-fit">
-                      <User className="h-3 w-3 text-[#D9A21B]" />
-                      <span className="text-[10px] text-gray-300 font-medium">
+                    <div className="flex items-center gap-2 mb-4 px-2 py-1.5 rounded-xl bg-white/5 border border-white/5 w-fit">
+                      <div className="h-5 w-5 rounded-full bg-[#D9A21B] flex items-center justify-center text-[10px] font-black text-black overflow-hidden flex-shrink-0">
+                        {agents.find(a => a.uid === lead.assignee_id)?.photo_url 
+                          ? <img src={agents.find(a => a.uid === lead.assignee_id)?.photo_url} alt="A" className="h-full w-full object-cover" />
+                          : (agents.find(a => a.uid === lead.assignee_id)?.name || 'V').charAt(0).toUpperCase()
+                        }
+                      </div>
+                      <span className="text-[11px] text-gray-300 font-bold">
                         {agents.find(a => a.uid === lead.assignee_id)?.name || 'Vendedor'}
                       </span>
                     </div>

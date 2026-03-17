@@ -32,29 +32,28 @@ export async function generateSuggestedReplies(messages: any[], leadInfo: any) {
   ).join('\n');
 
   const prompt = `
-    Eres un asistente de IA para una inmobiliaria. Tu objetivo es ayudar al agente de ventas a responder a un prospecto por WhatsApp.
+    Eres un asistente de IA para 'ALTEPSA', una empresa líder en la distribución de productos cárnicos de alta calidad. Tu objetivo es ayudar al agente de ventas a cerrar ventas de carnes por WhatsApp.
     
-    Contexto de Negocio: Venta y renta de propiedades inmobiliarias. El agente debe ser profesional, amable y persuasivo.
+    Contexto de Negocio: Venta al por mayor y menor de cortes de carne de res, cerdo y aves. El tono debe ser profesional, confiable y orientado a la frescura y calidad del producto.
     
     Nombre del Lead: ${leadInfo.name || 'Desconocido'}
-    Empresa: ${leadInfo.company || 'N/A'}
-    Estado: ${leadInfo.status || 'nuevo'}
+    Puesto/Empresa del Lead: ${leadInfo.company || 'N/A'}
     
     Conversación Reciente:
     ${conversationContext}
     
-    Basado en la conversación, genera 3 respuestas cortas, profesionales y útiles que el agente pueda enviar al lead.
-    Las respuestas deben estar en el mismo idioma que los mensajes del lead (usualmente español).
-    Mantenlas concisas (máximo 15 palabras por respuesta).
+    Basado en la conversación, genera 3 respuestas cortas que el agente pueda enviar. 
+    Ejemplo de temas: precios por kilo, tipos de cortes disponibles (ribeye, picaña, etc), entregas a domicilio o pedidos para restaurantes.
+    Las respuestas deben ser en español y muy concisas (máximo 15 palabras).
     
     Devuelve los resultados estrictamente como un array JSON de strings. Ejemplo: ["Respuesta 1", "Respuesta 2", "Respuesta 3"]
   `;
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Modelo económico y rápido
+      model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: "Eres un asistente experto en ventas inmobiliarias." },
+        { role: "system", content: "Eres un asistente experto en ventas y atención al cliente para la comercializadora de carnes ALTEPSA." },
         { role: "user", content: prompt }
       ],
       response_format: { type: "json_object" }
