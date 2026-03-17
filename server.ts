@@ -19,13 +19,28 @@ try {
   const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
   const serviceAccountPath = path.resolve(process.cwd(), 'service-account.json');
   
-  if (fs.existsSync(configPath) && fs.existsSync(serviceAccountPath)) {
-    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+  let configData: any;
+  let serviceAccountData: any;
+
+  // Prioridad 1: Variables de Entorno (Ideal para Docker/Easypanel)
+  if (process.env.FIREBASE_CONFIG && process.env.FIREBASE_SERVICE_ACCOUNT) {
+    configData = JSON.parse(process.env.FIREBASE_CONFIG);
+    serviceAccountData = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log('📦 Configuración de Firebase cargada desde Variables de Entorno');
+  } 
+  // Prioridad 2: Archivos Locales (Ideal para Desarrollo)
+  else if (fs.existsSync(configPath) && fs.existsSync(serviceAccountPath)) {
+    configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    serviceAccountData = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    console.log('📂 Configuración de Firebase cargada desde archivos locales');
+  }
+
+  if (configData && serviceAccountData) {
+    firebaseConfig = configData;
 
     if (!admin.apps.length) {
       admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
+        credential: admin.credential.cert(serviceAccountData),
         projectId: firebaseConfig.projectId
       });
     }
@@ -34,7 +49,7 @@ try {
     console.log('🚀 Firebase ADMIN inicializado para el proyecto:', firebaseConfig.projectId);
     console.log('✅ Conectado a base de datos:', firebaseConfig.firestoreDatabaseId || '(default)');
   } else {
-    console.error('CRITICAL: Firebase configuration files missing!');
+    console.error('CRITICAL: Firebase configuration missing (check env vars FIREBASE_CONFIG/FIREBASE_SERVICE_ACCOUNT or local JSON files)');
   }
 } catch (error) {
   console.error('Error initializing Firebase Admin:', error);
