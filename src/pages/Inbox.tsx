@@ -742,6 +742,31 @@ export default function Inbox() {
                    </div>
                 </div>
 
+                <div className="p-4 rounded-2xl bg-[#D9A21B]/5 border border-[#D9A21B]/20 space-y-4">
+                   <div>
+                       <div className="flex items-center gap-2 mb-2">
+                           <Sparkles className="h-3.5 w-3.5 text-[#D9A21B]" />
+                           <h4 className="text-[10px] text-[#D9A21B] uppercase font-black tracking-widest">Resumen IA</h4>
+                       </div>
+                       <p className="text-xs text-gray-300 leading-relaxed italic border-l-2 border-[#D9A21B]/30 pl-3">
+                           {selectedLead.summary || 'Aún no se ha generado un resumen con IA para este prospecto. Usa el Panel para generarlo.'}
+                       </p>
+                   </div>
+                   
+                   {selectedLead.tags && selectedLead.tags.length > 0 && (
+                     <div>
+                         <h4 className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-2">Etiquetas del Cliente</h4>
+                         <div className="flex flex-wrap gap-1.5">
+                             {selectedLead.tags.map((t: string) => (
+                                 <span key={t} className="px-2 py-1 rounded-md bg-white/5 text-gray-400 text-[9px] font-bold border border-white/10">
+                                     {t}
+                                 </span>
+                             ))}
+                         </div>
+                     </div>
+                   )}
+                </div>
+
                 <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
                    <div className="flex items-center justify-between">
                       <span className="text-[10px] text-gray-500 font-bold uppercase">Nombre Completo</span>

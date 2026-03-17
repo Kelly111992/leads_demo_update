@@ -88,12 +88,15 @@ export async function summarizeConversation(messages: any[]) {
   const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
   const conversationContext = messages.map(m => `${m.sender_id === 'client' ? 'Cliente' : 'Agente'}: ${m.content}`).join('\n');
 
-  const prompt = `Analiza esta conversación de WhatsApp de una comercializadora de carnes y genera un RESUMEN EJECUTIVO MUY CORTO (máximo 40 palabras) sobre qué busca el cliente, qué cortes le interesan y en qué estado quedó la negociación.
+  const prompt = `Analiza la siguiente conversación de WhatsApp entre un vendedor de de una comercializadora de carnes y un prospecto. Redacta un RESUMEN EJECUTIVO (máximo 60 palabras) enfocado en:
+  1. ¿Qué productos o cortes específicos de carne está buscando el cliente o por cuáles preguntó detalladamente?
+  2. ¿Captura todo el contexto relevante sobre sus intenciones o su negocio? (ej: si es restaurante, parrillada, consumo propio).
+  3. ¿En qué estado o punto quedó la negociación de venta?
   
   Conversación:
   ${conversationContext}
   
-  Devuelve el resultado en formato JSON: { "summary": "..." }`;
+  Devuelve el resultado estricto en formato JSON: { "summary": "..." }`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -121,11 +124,14 @@ export async function suggestTags(messages: any[]) {
   const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
   const conversationContext = messages.map(m => m.content).join(' ');
 
-  const prompt = `Analiza la conversación y sugiere etiquetas (tags) de máximo 2 palabras para categorizar a este cliente de una carnicería/comercializadora. Ejemplo: "Mayorista", "Restaurante", "Interesado en Ribeye", "Preguntó Precios".
+  const prompt = `Analiza la conversación de WhatsApp con un prospecto de comercializador de carnes. 
+  Genera etiquetas (tags) de máximo 2 palabras para categorizar su perfil y necesidades.
+  Es VITAL que las etiquetas reflejen el contexto completo de lo que preguntó, su rubro o intención.
+  Ejemplos: "Mayorista", "Restaurante", "Interesado en Ribeye", "Menudeo", "Cotizó Pollo".
   
   Texto: ${conversationContext}
   
-  Devuelve un array JSON de máximo 4 etiquetas: { "tags": ["tag1", "tag2"...] }`;
+  Devuelve un array JSON de máximo 4-5 etiquetas: { "tags": ["tag1", "tag2"...] }`;
 
   try {
     const response = await openai.chat.completions.create({
