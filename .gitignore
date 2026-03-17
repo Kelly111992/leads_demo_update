@@ -6,3 +6,28 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Firebase & Credentials
+service-account.json
+firebase-applet-config.json
+
+# Temporary / Debug / Test files
+*.txt
+test_*.ts
+test_*.js
+verify_db.ts
+list_leads.ts
+inject_test*.ts
+final_*.txt
+results.txt
+stderr*.txt
+error_log.txt
+last_resort.txt
+simulate_incoming.ts
+setup_webhook.ts
+send_test.ts
+check_leads.ts
+check_events_admin.ts
+test-evolution.ts
+test_local_webhook.ts
+test_webhook_url.ts
