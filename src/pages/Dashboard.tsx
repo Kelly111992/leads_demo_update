@@ -12,7 +12,9 @@ import {
   Tag, 
   UserPlus,
   MessageSquare,
-  TrendingUp
+  TrendingUp,
+  CalendarDays,
+  X as XIcon
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
@@ -29,6 +31,7 @@ export default function Dashboard() {
   const [carouselIndex, setCarouselIndex] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'lead' | 'messages' | 'system' } | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
 
   const fetchData = async () => {
     if (!userProfile) return;
@@ -43,9 +46,14 @@ export default function Dashboard() {
       if (error) throw error;
 
       if (allLeads) {
+        // Filter by date if selected
+        const filteredByDate = selectedDate 
+          ? allLeads.filter(l => l.created_at && l.created_at.startsWith(selectedDate))
+          : allLeads;
+
         // Calculate Stats
         const newStats = { nuevo: 0, asignado: 0, en_progreso: 0, cerrado_ganado: 0, cerrado_perdido: 0 };
-        allLeads.forEach((lead) => {
+        filteredByDate.forEach((lead) => {
           if (lead.status in newStats) {
             newStats[lead.status as keyof typeof newStats]++;
           }
@@ -53,7 +61,7 @@ export default function Dashboard() {
         setStats(newStats);
 
         // Recent Leads
-        const sortedLeads = [...allLeads].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        const sortedLeads = [...filteredByDate].sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
         setRecentLeads(sortedLeads.slice(0, 10));
 
         // Agent Performance
@@ -61,7 +69,7 @@ export default function Dashboard() {
           const { data: users } = await supabase.from('users').select('*').in('role', ['admin', 'agent']);
           if (users) {
             const performance = users.map(agent => {
-              const agentLeads = allLeads.filter(l => l.assignee_id === agent.uid);
+              const agentLeads = filteredByDate.filter(l => l.assignee_id === agent.uid);
               const wonLeads = agentLeads.filter(l => l.status === 'cerrado_ganado');
               const conversionRate = agentLeads.length > 0 ? (wonLeads.length / agentLeads.length) * 100 : 0;
               return {
@@ -155,14 +163,40 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-12 p-8 h-full overflow-y-auto bg-transparent">
-      <div className="flex justify-between items-start">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h2 className="text-3xl font-bold text-white">Resumen del Panel</h2>
-          <p className="text-gray-400 mt-1">Hola <span className="text-[#D9A21B]">{userProfile?.name}</span>, estas son tus métricas.</p>
+          <h1 className="text-3xl font-black text-white tracking-tight">Dashboard</h1>
+          <p className="text-gray-400 mt-1 font-medium">Panel de control y rendimiento de Altepsa.</p>
         </div>
-        <button onClick={() => setIsAddModalOpen(true)} className="px-5 py-2.5 bg-[#D9A21B] text-black rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-[#D9A21B]/20">
-          <UserPlus className="h-4 w-4" /> Nuevo Prospecto
-        </button>
+        
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div className="relative flex items-center min-w-[200px]">
+            <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#D9A21B] pointer-events-none" />
+            <input 
+              type="date" 
+              className="w-full pl-10 pr-10 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-gray-200 focus:bg-white/10 focus:ring-2 focus:ring-[#D9A21B]/50 transition-all [color-scheme:dark]"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+            />
+            {selectedDate && (
+              <button 
+                onClick={() => setSelectedDate('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-400 transition-colors"
+                title="Mostrar todo"
+              >
+                <XIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center justify-center px-6 py-2.5 bg-[#D9A21B] text-black rounded-xl font-bold text-sm hover:bg-[#D9A21B]/90 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-[#D9A21B]/20"
+          >
+            <UserPlus className="h-5 w-5 mr-2" />
+            Nuevo Prospecto
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
