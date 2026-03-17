@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles } from 'lucide-react';
+import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles, UserCheck, X as XIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
@@ -155,9 +155,18 @@ export default function Inbox() {
             const updated = [...prev, payload.new].sort((a, b) => 
               new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
             );
+            
+            // Auto-regenerar sugerencias IA si es un mensaje del CLIENTE y la IA está habilitada
+            if (payload.new.sender_id === 'client') {
+              const currentLead = leads.find(l => l.id === selectedLeadId);
+              if (currentLead?.ai_enabled) {
+                setAiSuggestions([]); // Limpiar viejas sugerencias
+                setTimeout(() => generateAi(updated, currentLead), 300);
+              }
+            }
+            
             return updated;
           });
-          // Push name might be missing in payload.new if it's from client, but we care about the bubbles appearing
           setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
         }
       })
@@ -425,6 +434,13 @@ export default function Inbox() {
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
+                <button 
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className="flex items-center justify-center p-1.5 rounded-lg border border-white/10 bg-white/5 text-gray-400 hover:bg-white/10 transition-all"
+                  title={isSidebarOpen ? 'Ocultar panel' : 'Mostrar panel'}
+                >
+                  {isSidebarOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+                </button>
               </div>
             </div>
 
@@ -480,42 +496,117 @@ export default function Inbox() {
       </div>
 
       {/* Right Panel: Lead Info */}
+      <AnimatePresence>
       {selectedLead && isSidebarOpen && (
-        <div className="w-80 border-l border-white/10 bg-black/20 flex flex-col">
-          <div className="flex border-b border-white/10">
+        <motion.div 
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: 320, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+          className="border-l border-white/10 bg-black/20 flex flex-col overflow-hidden flex-shrink-0"
+        >
+          <div className="flex border-b border-white/10 flex-shrink-0">
             <button onClick={() => setActiveTab('overview')} className={`flex-1 py-4 text-xs font-bold uppercase ${activeTab === 'overview' ? 'text-[#D9A21B] border-b-2 border-[#D9A21B]' : 'text-gray-500'}`}>Info</button>
             <button onClick={() => setActiveTab('notes')} className={`flex-1 py-4 text-xs font-bold uppercase ${activeTab === 'notes' ? 'text-[#D9A21B] border-b-2 border-[#D9A21B]' : 'text-gray-500'}`}>Notas</button>
           </div>
-          <div className="p-6 space-y-6">
+          <div className="p-5 space-y-5 overflow-y-auto flex-1" style={{ minWidth: 320 }}>
+            {/* VENDEDOR ASSIGNMENT - Premium Cards */}
             <div>
-              <label className="block text-[10px] text-gray-500 uppercase font-bold mb-2">Vendedor</label>
-              <select 
-                value={selectedLead.assignee_id || ''} 
-                onChange={e => handleAssignAgent(e.target.value)}
-                className="w-full bg-[#111] border border-white/10 rounded-lg py-2 px-3 text-sm text-white outline-none"
-              >
-                <option value="" className="bg-[#111] text-gray-300">Sin asignar</option>
-                {agents.map(a => <option key={a.uid} value={a.uid} className="bg-[#111] text-white">{a.name} {a.last_name || ''}</option>)}
-              </select>
+              <label className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-3">Asignar Vendedor</label>
+              <div className="space-y-2">
+                {agents.map(a => {
+                  const isAssigned = selectedLead.assignee_id === a.uid;
+                  return (
+                    <button
+                      key={a.uid}
+                      onClick={() => handleAssignAgent(isAssigned ? '' : a.uid)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 text-left group ${
+                        isAssigned 
+                          ? 'bg-[#D9A21B]/15 border-[#D9A21B]/40 shadow-lg shadow-[#D9A21B]/10' 
+                          : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden ${
+                        isAssigned 
+                          ? 'bg-[#D9A21B] text-black ring-2 ring-[#D9A21B]/50' 
+                          : 'bg-white/10 text-gray-400 group-hover:bg-white/20'
+                      }`}>
+                        {a.photo_url 
+                          ? <img src={a.photo_url} alt={a.name} className="h-full w-full object-cover" />
+                          : (a.name?.charAt(0) || 'V').toUpperCase()
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold truncate ${isAssigned ? 'text-[#D9A21B]' : 'text-white'}`}>
+                          {a.name} {a.last_name || ''}
+                        </p>
+                        <p className="text-[10px] text-gray-500 truncate">{a.email || a.role}</p>
+                      </div>
+                      {isAssigned && (
+                        <UserCheck className="h-4 w-4 text-[#D9A21B] flex-shrink-0" />
+                      )}
+                    </button>
+                  );
+                })}
+                {selectedLead.assignee_id && (
+                  <button
+                    onClick={() => handleAssignAgent('')}
+                    className="w-full text-center py-2 text-[10px] text-gray-500 hover:text-red-400 transition-colors uppercase tracking-wider font-bold"
+                  >
+                    Quitar asignación
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* ETIQUETAS */}
             <div>
-              <label className="block text-[10px] text-gray-500 uppercase font-bold mb-2">Etiquetas</label>
+              <label className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-3">Etiquetas</label>
               <div className="flex flex-wrap gap-2 mb-3">
                 {selectedLead.tags?.map((t: string) => (
-                  <span key={t} className="px-2 py-1 rounded bg-[#D9A21B]/20 text-[#D9A21B] text-[10px] flex items-center gap-1">
-                    {t} <X className="h-3 w-3 cursor-pointer" onClick={() => handleRemoveTag(t)} />
+                  <span key={t} className="px-2.5 py-1 rounded-lg bg-[#D9A21B]/15 text-[#D9A21B] text-[11px] font-medium flex items-center gap-1.5 border border-[#D9A21B]/20">
+                    {t}
+                    <button onClick={() => handleRemoveTag(t)} className="hover:text-red-400 transition-colors">
+                      <XIcon className="h-3 w-3" />
+                    </button>
                   </span>
                 ))}
               </div>
               <input 
-                placeholder="Añadir etiqueta..." 
-                onKeyDown={e => e.key === 'Enter' && handleAddTag((e.target as HTMLInputElement).value)}
-                className="w-full bg-white/5 border border-white/10 rounded-lg py-1.5 px-3 text-[10px] text-white outline-none"
+                placeholder="Escribir etiqueta + Enter" 
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const val = (e.target as HTMLInputElement).value;
+                    handleAddTag(val);
+                    (e.target as HTMLInputElement).value = '';
+                  }
+                }}
+                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs text-white outline-none focus:ring-1 focus:ring-[#D9A21B]/50 placeholder-gray-600"
               />
             </div>
+
+            {/* LEAD INFO */}
+            <div>
+              <label className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-3">Información</label>
+              <div className="space-y-2">
+                <div className="flex justify-between py-2 px-3 rounded-lg bg-white/5">
+                  <span className="text-[11px] text-gray-500">Teléfono</span>
+                  <span className="text-[11px] text-white font-medium">{selectedLead.phone}</span>
+                </div>
+                <div className="flex justify-between py-2 px-3 rounded-lg bg-white/5">
+                  <span className="text-[11px] text-gray-500">Estado</span>
+                  <span className="text-[11px] text-[#D9A21B] font-medium">{(selectedLead.status || 'nuevo').replace('_', ' ')}</span>
+                </div>
+                <div className="flex justify-between py-2 px-3 rounded-lg bg-white/5">
+                  <span className="text-[11px] text-gray-500">Fuente</span>
+                  <span className="text-[11px] text-white font-medium">{selectedLead.source || 'WhatsApp'}</span>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Confirmation Modal */}
       {confirmDelete && (
@@ -537,8 +628,3 @@ export default function Inbox() {
   );
 }
 
-function X({ className, onClick }: { className?: string, onClick?: () => void }) {
-  return (
-    <svg onClick={onClick} className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-  );
-}
