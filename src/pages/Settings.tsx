@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabase';
-import { Loader2, Save, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, Save, CheckCircle2, AlertCircle, RefreshCw, Plus, Trash2, Edit3, X as XIcon } from 'lucide-react';
 
 export default function Settings() {
   const { userProfile } = useAuth();
@@ -20,6 +20,27 @@ export default function Settings() {
     defaultAiEnabled: true
   });
   const [openaiConfig, setOpenaiConfig] = useState({ apiKey: '' });
+
+  // Templates state
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [newTemplate, setNewTemplate] = useState({ label: '', content: '', color: 'blue' });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editData, setEditData] = useState({ label: '', content: '', color: 'blue' });
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  const colorOptions = [
+    { value: 'emerald', label: 'Verde', cls: 'bg-emerald-500' },
+    { value: 'blue', label: 'Azul', cls: 'bg-blue-500' },
+    { value: 'amber', label: 'Dorado', cls: 'bg-amber-500' },
+    { value: 'purple', label: 'Morado', cls: 'bg-purple-500' },
+    { value: 'cyan', label: 'Cyan', cls: 'bg-cyan-500' },
+    { value: 'red', label: 'Rojo', cls: 'bg-red-500' },
+  ];
+
+  const fetchTemplates = async () => {
+    const { data } = await supabase.from('templates').select('*').order('created_at', { ascending: true });
+    if (data) setTemplates(data);
+  };
 
   useEffect(() => {
     async function fetchConfig() {
@@ -43,6 +64,8 @@ export default function Settings() {
         if (openaiData && openaiData.value) {
           setOpenaiConfig(openaiData.value);
         }
+
+        await fetchTemplates();
       } catch (error) {
         console.error("Error fetching config:", error);
       } finally {
@@ -52,7 +75,6 @@ export default function Settings() {
     fetchConfig();
   }, []);
 
-  // Guardar SOLO la configuración de Evolution API
   const handleSaveEvolution = async () => {
     setSaving(true);
     setSaveStatus('idle');
@@ -72,7 +94,6 @@ export default function Settings() {
     }
   };
 
-  // Guardar SOLO la configuración de OpenAI
   const handleSaveOpenAI = async () => {
     setSavingAi(true);
     setSaveAiStatus('idle');
@@ -111,6 +132,53 @@ export default function Settings() {
     }
   };
 
+  const handleAddTemplate = async () => {
+    if (!newTemplate.label.trim() || !newTemplate.content.trim()) return;
+    setSavingTemplate(true);
+    try {
+      const { error } = await supabase.from('templates').insert([{
+        label: newTemplate.label.trim(),
+        content: newTemplate.content.trim(),
+        color: newTemplate.color,
+        icon: 'MessageSquare',
+        system_token: 'claveai'
+      }]);
+      if (error) throw error;
+      setNewTemplate({ label: '', content: '', color: 'blue' });
+      await fetchTemplates();
+    } catch (error) {
+      console.error("Error adding template:", error);
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const handleUpdateTemplate = async (id: string) => {
+    if (!editData.label.trim() || !editData.content.trim()) return;
+    try {
+      const { error } = await supabase.from('templates').update({
+        label: editData.label.trim(),
+        content: editData.content.trim(),
+        color: editData.color,
+        updated_at: new Date().toISOString()
+      }).eq('id', id);
+      if (error) throw error;
+      setEditingId(null);
+      await fetchTemplates();
+    } catch (error) {
+      console.error("Error updating template:", error);
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    try {
+      await supabase.from('templates').delete().eq('id', id);
+      await fetchTemplates();
+    } catch (error) {
+      console.error("Error deleting template:", error);
+    }
+  };
+
   const isAdmin = userProfile?.role === 'admin';
 
   if (loading) {
@@ -141,6 +209,129 @@ export default function Settings() {
               <span className="text-white">{userProfile?.email}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Plantillas Rápidas */}
+      <div className="glass-panel rounded-2xl p-8 bg-black/20 border border-white/5 space-y-6">
+        <div>
+          <h3 className="text-xl font-semibold text-white">Plantillas Rápidas</h3>
+          <p className="text-xs text-gray-400 mt-1">Respuestas predefinidas que aparecen en la conversación para responder con un solo clic.</p>
+        </div>
+
+        {/* Existing Templates */}
+        <div className="space-y-3">
+          {templates.map(t => (
+            <div key={t.id} className="flex items-start gap-3 p-4 rounded-xl bg-white/5 border border-white/10 group">
+              {editingId === t.id ? (
+                <div className="flex-1 space-y-3">
+                  <div className="flex gap-2">
+                    <input
+                      value={editData.label}
+                      onChange={e => setEditData({ ...editData, label: e.target.value })}
+                      className="flex-1 bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#D9A21B]/50"
+                      placeholder="Etiqueta"
+                    />
+                    <select
+                      value={editData.color}
+                      onChange={e => setEditData({ ...editData, color: e.target.value })}
+                      className="bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-sm text-white outline-none"
+                    >
+                      {colorOptions.map(c => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <textarea
+                    value={editData.content}
+                    onChange={e => setEditData({ ...editData, content: e.target.value })}
+                    className="w-full bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#D9A21B]/50 min-h-[60px] resize-none"
+                    placeholder="Contenido del mensaje"
+                  />
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleUpdateTemplate(t.id)}
+                      className="px-4 py-1.5 bg-[#D9A21B] text-black text-xs font-bold rounded-lg hover:bg-[#D9A21B]/80 transition-all"
+                    >
+                      Guardar
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="px-4 py-1.5 text-gray-400 text-xs font-bold hover:text-white transition-all"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className={`h-3 w-3 rounded-full mt-1.5 flex-shrink-0 bg-${t.color}-500`}></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-white">{t.label}</p>
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">{t.content}</p>
+                  </div>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <button
+                      onClick={() => {
+                        setEditingId(t.id);
+                        setEditData({ label: t.label, content: t.content, color: t.color });
+                      }}
+                      className="p-1.5 rounded-lg hover:bg-white/10 text-gray-400 hover:text-[#D9A21B] transition-all"
+                      title="Editar"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTemplate(t.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-all"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+          {templates.length === 0 && (
+            <p className="text-center text-sm text-gray-500 py-6">No hay plantillas. Agrega la primera abajo.</p>
+          )}
+        </div>
+
+        {/* Add New Template */}
+        <div className="border-t border-white/10 pt-6 space-y-3">
+          <p className="text-xs text-gray-500 uppercase font-black tracking-widest">Agregar Nueva Plantilla</p>
+          <div className="flex gap-2">
+            <input
+              value={newTemplate.label}
+              onChange={e => setNewTemplate({ ...newTemplate, label: e.target.value })}
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#D9A21B]/50 placeholder-gray-600"
+              placeholder="Ej: Bienvenida"
+            />
+            <select
+              value={newTemplate.color}
+              onChange={e => setNewTemplate({ ...newTemplate, color: e.target.value })}
+              className="bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-gray-300 outline-none"
+            >
+              {colorOptions.map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+          <textarea
+            value={newTemplate.content}
+            onChange={e => setNewTemplate({ ...newTemplate, content: e.target.value })}
+            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#D9A21B]/50 placeholder-gray-600 min-h-[80px] resize-none"
+            placeholder="Escribe el contenido del mensaje..."
+          />
+          <button
+            onClick={handleAddTemplate}
+            disabled={savingTemplate || !newTemplate.label.trim() || !newTemplate.content.trim()}
+            className="inline-flex items-center px-5 py-2.5 bg-[#D9A21B] text-black font-bold rounded-xl text-sm hover:bg-[#D9A21B]/90 transition-all disabled:opacity-50 gap-2"
+          >
+            {savingTemplate ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+            Agregar Plantilla
+          </button>
         </div>
       </div>
       
