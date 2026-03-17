@@ -17,7 +17,7 @@ export default function Users() {
   const [editingVendor, setEditingVendor] = useState<any>(null);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [vendorForm, setVendorForm] = useState({ name: '', email: '', phone: '', category: '', photo_url: '' });
-  const [userForm, setUserForm] = useState({ name: '', email: '', photo_url: '', role: 'agent', status: 'active' });
+  const [userForm, setUserForm] = useState({ name: '', last_name: '', phone: '', email: '', photo_url: '', role: 'agent', status: 'active' });
 
   const fetchData = async () => {
     if (userProfile?.role !== 'admin') return;
@@ -55,6 +55,8 @@ export default function Users() {
     try {
       const userData = {
         name: userForm.name,
+        last_name: userForm.last_name || null,
+        phone: userForm.phone || null,
         email: userForm.email,
         photo_url: userForm.photo_url || null,
         role: userForm.role,
@@ -69,7 +71,7 @@ export default function Users() {
       }
       setIsUserModalOpen(false);
       setEditingUser(null);
-      setUserForm({ name: '', email: '', photo_url: '', role: 'agent', status: 'active' });
+      setUserForm({ name: '', last_name: '', phone: '', email: '', photo_url: '', role: 'agent', status: 'active' });
       fetchData();
     } catch (error) {
       console.error("Error saving user:", error);
@@ -132,7 +134,7 @@ export default function Users() {
           onClick={() => {
             if (activeTab === 'users') {
               setEditingUser(null);
-              setUserForm({ name: '', email: '', photo_url: '', role: 'agent', status: 'active' });
+              setUserForm({ name: '', last_name: '', phone: '', email: '', photo_url: '', role: 'agent', status: 'active' });
               setIsUserModalOpen(true);
             } else {
               setEditingVendor(null);
@@ -161,8 +163,12 @@ export default function Users() {
                   {item.photo_url ? <img src={item.photo_url} alt={item.name} className="h-full w-full object-cover" /> : (item.name?.charAt(0) || 'U')}
                 </div>
                 <div>
-                  <p className="text-white font-bold">{item.name}</p>
-                  <p className="text-xs text-gray-500">{item.email}</p>
+                  <p className="text-white font-bold">
+                    {item.name} {activeTab === 'users' && item.last_name ? item.last_name : ''}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {item.email} {activeTab === 'users' && item.phone ? ` • ${item.phone}` : ''}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -191,8 +197,14 @@ export default function Users() {
           <div className="bg-[#111] border border-white/10 p-8 rounded-3xl w-full max-w-md">
             <h3 className="text-xl font-bold text-white mb-6">Usuario</h3>
             <form onSubmit={handleSaveUser} className="space-y-4">
-              <input value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} placeholder="Nombre" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white" />
-              <input value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} placeholder="Email" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white" />
+              <div className="grid grid-cols-2 gap-4">
+                <input value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} placeholder="Nombre" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white" required />
+                <input value={userForm.last_name} onChange={e => setUserForm({...userForm, last_name: e.target.value})} placeholder="Apellidos" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white" />
+              </div>
+              <input value={userForm.email} type="email" onChange={e => setUserForm({...userForm, email: e.target.value})} placeholder="Email" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white" required />
+              <input value={userForm.phone} onChange={e => setUserForm({...userForm, phone: e.target.value})} placeholder="Teléfono" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white" />
+              <input value={userForm.photo_url} onChange={e => setUserForm({...userForm, photo_url: e.target.value})} placeholder="URL de Foto / Avatar" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white" />
+              
               <div className="flex justify-end gap-3 mt-8">
                 <button type="button" onClick={() => setIsUserModalOpen(false)} className="px-4 py-2 text-gray-400">Cancelar</button>
                 <button type="submit" className="px-6 py-2 bg-[#D9A21B] text-black font-bold rounded-xl">Guardar</button>

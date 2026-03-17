@@ -196,6 +196,11 @@ export default function Inbox() {
     const newValue = !isAiEnabled;
     setIsAiEnabled(newValue);
     await handleUpdateLeadField('ai_enabled', newValue);
+    // Automatically trigger AI if toggled on and there are messages
+    if (newValue && messages.length > 0) {
+      const currentLead = leads.find(l => l.id === selectedLeadId);
+      if (currentLead) generateAi(messages, currentLead);
+    }
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -405,13 +410,23 @@ export default function Inbox() {
                   <p className="text-xs text-[#D9A21B]/80">{selectedLead.phone}</p>
                 </div>
               </div>
-              <button 
-                onClick={handleToggleAi}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border ${isAiEnabled ? 'bg-[#D9A21B]/20 border-[#D9A21B]/30 text-[#D9A21B]' : 'bg-white/5 border-white/10 text-gray-400'}`}
-              >
-                <Bot className="h-4 w-4" />
-                <span className="text-xs font-medium">Copiloto IA</span>
-              </button>
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleToggleAi}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-all ${isAiEnabled ? 'bg-[#D9A21B]/20 border-[#D9A21B]/30 text-[#D9A21B]' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                  title={isAiEnabled ? 'IA Copiloto activada. Generando sugerencias contextuales.' : 'Activar IA Copiloto'}
+                >
+                  <Bot className="h-4 w-4" />
+                  <span className="text-xs font-medium">Copiloto IA</span>
+                </button>
+                <button 
+                  onClick={() => setConfirmDelete({ id: selectedLead.id, type: 'lead' })}
+                  className="flex items-center justify-center p-1.5 rounded-lg border border-red-500/20 bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all"
+                  title="Eliminar Conversación"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
@@ -430,8 +445,13 @@ export default function Inbox() {
             </div>
 
             <div className="p-4 bg-black/20 border-t border-white/10">
-              {isAiEnabled && aiSuggestions.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto mb-3">
+              {isAiEnabled && isGeneratingAi && (
+                <div className="text-xs text-[#D9A21B] flex items-center gap-2 mb-3">
+                  <Loader2 className="h-3 w-3 animate-spin"/> Leyendo contexto de la conversación...
+                </div>
+              )}
+              {isAiEnabled && !isGeneratingAi && aiSuggestions.length > 0 && (
+                <div className="flex gap-2 overflow-x-auto mb-3 pb-1">
                   {aiSuggestions.map((s, i) => (
                     <button key={i} onClick={() => setNewMessage(s)} className="px-3 py-1.5 rounded-lg text-xs bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 whitespace-nowrap">
                       {s}
@@ -476,7 +496,7 @@ export default function Inbox() {
                 className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-3 text-sm text-white outline-none"
               >
                 <option value="">Sin asignar</option>
-                {agents.map(a => <option key={a.uid} value={a.uid}>{a.name}</option>)}
+                {agents.map(a => <option key={a.uid} value={a.uid}>{a.name} {a.last_name || ''}</option>)}
               </select>
             </div>
             <div>
