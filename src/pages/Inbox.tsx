@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles, UserCheck, X as XIcon, Calendar, Clock, ClipboardCheck, Zap, Phone, Mail, Building2, History, DollarSign, TrendingUp, CheckCircle2, Award } from 'lucide-react';
+import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles, UserCheck, X as XIcon, Calendar, Clock, ClipboardCheck, Zap, Phone, Mail, Building2, History, DollarSign, TrendingUp, CheckCircle2, Award, CalendarDays } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
@@ -15,6 +15,7 @@ export default function Inbox() {
   const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDate, setSelectedDate] = useState<string>('');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -370,10 +371,11 @@ export default function Inbox() {
   };
 
   const selectedLead = leads.find(l => l.id === selectedLeadId);
-  const filteredLeads = leads.filter(l => 
-    (l.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (l.phone || '').includes(searchTerm)
-  );
+  const filteredLeads = leads.filter(l => {
+    const matchesSearch = (l.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || (l.phone || '').includes(searchTerm);
+    const matchesDate = selectedDate ? l.created_at && l.created_at.startsWith(selectedDate) : true;
+    return matchesSearch && matchesDate;
+  });
 
   return (
     <div className="h-full flex bg-transparent overflow-hidden">
@@ -392,15 +394,36 @@ export default function Inbox() {
               </button>
             )}
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Buscar prospectos..." 
-              className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:bg-white/10 focus:ring-2 focus:ring-[#D9A21B]/50 focus:border-transparent outline-none transition-all"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-            />
+          <div className="flex flex-col gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input 
+                type="text" 
+                placeholder="Buscar prospectos..." 
+                className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:bg-white/10 focus:ring-2 focus:ring-[#D9A21B]/50 focus:border-transparent outline-none transition-all"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="relative flex items-center">
+              <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              <input 
+                type="date" 
+                className="w-full pl-9 pr-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-gray-300 focus:bg-white/10 focus:ring-2 focus:ring-[#D9A21B]/50 focus:border-transparent outline-none transition-all [color-scheme:dark]"
+                value={selectedDate}
+                onChange={e => setSelectedDate(e.target.value)}
+                title="Filtrar por fecha de llegada"
+              />
+              {selectedDate && (
+                <button 
+                  onClick={() => setSelectedDate('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-red-400 transition-colors"
+                  title="Limpiar fecha"
+                >
+                  <XIcon className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
