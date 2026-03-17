@@ -577,6 +577,20 @@ export default function Inbox() {
                   </div>
                 </div>
 
+                {/* CRM SUMMARY */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <ClipboardCheck className="h-3.5 w-3.5 text-[#D9A21B]" />
+                    <label className="text-[10px] text-gray-300 uppercase font-black tracking-widest">Resumen del Cliente</label>
+                  </div>
+                  <textarea 
+                    value={selectedLead.summary || ''}
+                    onChange={(e) => handleUpdateLeadField('summary', e.target.value)}
+                    placeholder="Lo que busca el cliente, cortes favoritos..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-[#D9A21B]/50 min-h-[100px] resize-none leading-relaxed"
+                  />
+                </div>
+
                 {/* ETIQUETAS */}
                 <div>
                   <label className="block text-[10px] text-gray-500 uppercase font-black tracking-widest mb-3">Etiquetas de Canal</label>
