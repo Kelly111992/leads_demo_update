@@ -97,30 +97,81 @@ export default function Inbox() {
     }
   };
 
+  // Lead real-time subscription
   useEffect(() => {
     fetchLeads();
     fetchAgents();
     fetchTags();
 
-    const leadsSub = supabase.channel('leads-inbox')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => fetchLeads())
-      .subscribe();
+    console.log('🔗 Suscribiendo a cambios en leads...');
+    const leadsSub = supabase.channel('leads-global-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
+        const newData = payload.new as any;
+        console.log('📝 Cambio en Leads detectado:', payload.eventType, newData?.name);
+        
+        if (payload.eventType === 'INSERT') {
+          setLeads(prev => {
+            if (prev.some(l => l.id === payload.new.id)) return prev;
+            return [payload.new, ...prev].sort((a, b) => 
+              new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()
+            );
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          setLeads(prev => {
+            const updated = prev.map(l => l.id === payload.new.id ? { ...l, ...payload.new } : l);
+            return [...updated].sort((a, b) => 
+              new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime()
+            );
+          });
+        } else if (payload.eventType === 'DELETE') {
+          setLeads(prev => prev.filter(l => l.id === payload.old.id));
+        }
+      })
+      .subscribe((status) => {
+        console.log('📡 Estado subscripción Leads:', status);
+      });
 
-    return () => { supabase.removeChannel(leadsSub); };
+    return () => {
+      console.log('📴 Cancelando subscripción Leads');
+      supabase.removeChannel(leadsSub);
+    };
   }, [userProfile]);
 
+  // Message real-time subscription
   useEffect(() => {
-    if (!selectedLeadId) {
-      setMessages([]);
-      return;
-    }
+    if (!selectedLeadId) return;
     fetchMessages(selectedLeadId);
     
-    const msgSub = supabase.channel(`msgs-${selectedLeadId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `lead_id=eq.${selectedLeadId}` }, () => fetchMessages(selectedLeadId))
-      .subscribe();
+    console.log(`🔗 Suscribiendo a mensajes del lead: ${selectedLeadId}`);
+    
+    // Using a broader channel for stability and filtering locally
+    const msgSub = supabase.channel('messages-global-channel')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        // Filter messages for the current lead ONLY
+        if (payload.new.lead_id === selectedLeadId) {
+          console.log('📩 Nuevo mensaje recibido para este lead:', payload.new.content);
+          setMessages(prev => {
+            if (prev.some(m => m.id === payload.new.id)) return prev;
+            const updated = [...prev, payload.new].sort((a, b) => 
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            );
+            return updated;
+          });
+          // Push name might be missing in payload.new if it's from client, but we care about the bubbles appearing
+          setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
+        setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+      })
+      .subscribe((status) => {
+        console.log(`📡 Estado subscripción Mensajes (${selectedLeadId}):`, status);
+      });
 
-    return () => { supabase.removeChannel(msgSub); };
+    return () => {
+      console.log(`📴 Cancelando subscripción Mensajes para ${selectedLeadId}`);
+      supabase.removeChannel(msgSub);
+    };
   }, [selectedLeadId]);
 
   useEffect(() => {
@@ -160,7 +211,19 @@ export default function Inbox() {
     try {
       const now = new Date().toISOString();
       const messageId = `msg_${Date.now()}`;
-      
+
+      // Optimistic UI Update
+      const tempMsg = {
+        id: messageId,
+        lead_id: selectedLeadId,
+        sender_id: userProfile.uid,
+        content: msgText,
+        timestamp: now,
+        system_token: 'claveai'
+      };
+      setMessages(prev => [...prev, tempMsg]);
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+
       const { error: msgError } = await supabase.from('messages').insert([{
         id: messageId,
         lead_id: selectedLeadId,
@@ -170,7 +233,10 @@ export default function Inbox() {
         system_token: 'claveai'
       }]);
 
-      if (msgError) throw msgError;
+      if (msgError) {
+        setMessages(prev => prev.filter(m => m.id !== messageId));
+        throw msgError;
+      }
 
       await supabase.from('leads').update({
         updated_at: now,

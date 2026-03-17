@@ -38,9 +38,16 @@ export default function Leads() {
     fetchLeads();
 
     const channel = supabase
-      .channel('public:leads')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
-        fetchLeads();
+      .channel('public:leads:kanban')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
+        console.log('Realtime Leads Event (Kanban):', payload.eventType, payload.new);
+        if (payload.eventType === 'INSERT') {
+          setLeads(prev => [payload.new, ...prev]);
+        } else if (payload.eventType === 'UPDATE') {
+          setLeads(prev => prev.map(l => l.id === payload.new.id ? { ...l, ...payload.new } : l));
+        } else if (payload.eventType === 'DELETE') {
+          setLeads(prev => prev.filter(l => l.id === payload.old.id));
+        }
       })
       .subscribe();
 

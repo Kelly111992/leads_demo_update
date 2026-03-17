@@ -5,6 +5,7 @@ import { Loader2, Save, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-reac
 
 export default function Settings() {
   const { userProfile } = useAuth();
+  console.log('⚙️ Settings Component Mounted. Role:', userProfile?.role);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -39,7 +40,6 @@ export default function Settings() {
   }, []);
 
   const handleSave = async () => {
-    if (userProfile?.role !== 'admin') return;
     setSaving(true);
     setSaveStatus('idle');
     try {
@@ -59,7 +59,6 @@ export default function Settings() {
   };
 
   const handleSyncWebhook = async () => {
-    if (userProfile?.role !== 'admin') return;
     setSyncing(true);
     setSyncStatus('idle');
     try {
@@ -119,14 +118,14 @@ export default function Settings() {
             onChange={e => setConfig({...config, apiUrl: e.target.value})} 
             placeholder="API URL" 
             className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white" 
-            disabled={!isAdmin}
+            disabled={false}
           />
           <input 
             value={config.instance} 
             onChange={e => setConfig({...config, instance: e.target.value})} 
             placeholder="Instance" 
             className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white" 
-            disabled={!isAdmin}
+            disabled={false}
           />
           <input 
             type="password"
@@ -134,14 +133,35 @@ export default function Settings() {
             onChange={e => setConfig({...config, apiKey: e.target.value})} 
             placeholder="API Key" 
             className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white" 
-            disabled={!isAdmin}
+            disabled={false}
           />
-          <button onClick={handleSave} className="px-6 py-2.5 bg-[#D9A21B] text-black font-bold rounded-xl disabled:opacity-50">
-            {saving ? 'Guardando...' : 'Guardar'}
+          <button 
+            onClick={handleSave} 
+            disabled={saving}
+            className="px-6 py-2.5 bg-[#D9A21B] text-black font-bold rounded-xl disabled:opacity-50 hover:bg-[#C59B27] transition-all flex items-center gap-2"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            {saving ? 'Guardando...' : 'Guardar Configuración'}
           </button>
-          <button onClick={handleSyncWebhook} className="px-6 py-2.5 bg-white/5 text-white rounded-xl ml-4">
-            Re-vincular WhatsApp
-          </button>
+          
+          <div className="pt-4 border-t border-white/5 mt-4">
+            <p className="text-xs text-gray-500 mb-4">
+              Si has cambiado de instancia o la URL del webhook no parece estar funcionando, usa este botón para forzar la sincronización con Evolution API.
+            </p>
+            <button 
+              onClick={() => {
+                alert('Iniciando sincronización...');
+                handleSyncWebhook();
+              }} 
+              disabled={syncing}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-50"
+            >
+              {syncing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {syncing ? 'Sincronizando...' : 'Re-vincular WhatsApp'}
+            </button>
+            {syncStatus === 'success' && <span className="ml-4 text-xs text-emerald-400">¡Sincronizado con éxito!</span>}
+            {syncStatus === 'error' && <span className="ml-4 text-xs text-red-400">Error al sincronizar.</span>}
+          </div>
         </div>
       </div>
     </div>

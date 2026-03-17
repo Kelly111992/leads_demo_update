@@ -108,7 +108,7 @@ export default function Layout() {
               animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
               exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
               transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-              className="h-full rounded-2xl overflow-hidden glass-panel shadow-2xl"
+              className="h-full rounded-2xl overflow-hidden glass-panel shadow-2xl pointer-events-auto"
             >
               <Outlet />
             </motion.div>

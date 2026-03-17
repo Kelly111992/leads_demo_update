@@ -88,8 +88,13 @@ export default function Dashboard() {
   useEffect(() => {
     fetchData();
 
-    const channel = supabase.channel('dashboard-refresher')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => fetchData())
+    const channel = supabase.channel('dashboard-refresher-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, (payload) => {
+        console.log('Realtime Dashboard Event:', payload.eventType);
+        // On any lead change, it's safer to re-fetch stats and recent leads since they are aggregates
+        // But we add a small delay to ensure indexing is finished
+        setTimeout(() => fetchData(), 200);
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };

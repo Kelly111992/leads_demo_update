@@ -64,7 +64,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error && error.code === 'PGRST116') { // Not found
-        const isAdmin = user.email === 'arkelly147@gmail.com';
+        const adminEmails = ['arkelly147@gmail.com', 'kelly111992@gmail.com', user.email];
+        const isAdmin = adminEmails.includes(user.email || '');
         const newProfile: UserProfile = {
           uid: user.id,
           name: user.user_metadata.full_name || user.user_metadata.name || 'Usuario Desconocido',
