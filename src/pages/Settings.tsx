@@ -9,6 +9,8 @@ export default function Settings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [savingAi, setSavingAi] = useState(false);
+  const [saveAiStatus, setSaveAiStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [config, setConfig] = useState({
@@ -22,7 +24,7 @@ export default function Settings() {
   useEffect(() => {
     async function fetchConfig() {
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('settings')
           .select('value')
           .eq('key', 'evolution_api')
@@ -50,25 +52,43 @@ export default function Settings() {
     fetchConfig();
   }, []);
 
-  const handleSave = async () => {
+  // Guardar SOLO la configuración de Evolution API
+  const handleSaveEvolution = async () => {
     setSaving(true);
     setSaveStatus('idle');
     try {
       const { error } = await supabase
         .from('settings')
-        .upsert([
-          { key: 'evolution_api', value: config },
-          { key: 'openai_api', value: openaiConfig }
-        ]);
+        .upsert([{ key: 'evolution_api', value: config }]);
       
       if (error) throw error;
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 3000);
     } catch (error) {
-      console.error("Error saving config:", error);
+      console.error("Error saving Evolution config:", error);
       setSaveStatus('error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Guardar SOLO la configuración de OpenAI
+  const handleSaveOpenAI = async () => {
+    setSavingAi(true);
+    setSaveAiStatus('idle');
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .upsert([{ key: 'openai_api', value: openaiConfig }]);
+      
+      if (error) throw error;
+      setSaveAiStatus('success');
+      setTimeout(() => setSaveAiStatus('idle'), 3000);
+    } catch (error) {
+      console.error("Error saving OpenAI config:", error);
+      setSaveAiStatus('error');
+    } finally {
+      setSavingAi(false);
     }
   };
 
@@ -132,31 +152,32 @@ export default function Settings() {
             onChange={e => setConfig({...config, apiUrl: e.target.value})} 
             placeholder="API URL" 
             className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white" 
-            disabled={false}
           />
           <input 
             value={config.instance} 
             onChange={e => setConfig({...config, instance: e.target.value})} 
             placeholder="Instance" 
             className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white" 
-            disabled={false}
           />
           <input 
             type="password"
             value={config.apiKey} 
             onChange={e => setConfig({...config, apiKey: e.target.value})} 
-            placeholder="API Key" 
+            placeholder="Evolution API Key" 
             className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white" 
-            disabled={false}
           />
-          <button 
-            onClick={handleSave} 
-            disabled={saving}
-            className="px-6 py-2.5 bg-[#D9A21B] text-black font-bold rounded-xl disabled:opacity-50 hover:bg-[#C59B27] transition-all flex items-center gap-2"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? 'Guardando...' : 'Guardar Configuración'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleSaveEvolution} 
+              disabled={saving}
+              className="px-6 py-2.5 bg-[#D9A21B] text-black font-bold rounded-xl disabled:opacity-50 hover:bg-[#C59B27] transition-all flex items-center gap-2"
+            >
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? 'Guardando...' : 'Guardar Evolution'}
+            </button>
+            {saveStatus === 'success' && <span className="text-xs text-emerald-400">✅ ¡Guardado!</span>}
+            {saveStatus === 'error' && <span className="text-xs text-red-400">❌ Error al guardar</span>}
+          </div>
           
           <div className="pt-4 border-t border-white/5 mt-4">
             <p className="text-xs text-gray-500 mb-4">
@@ -182,7 +203,7 @@ export default function Settings() {
       <div className="glass-panel rounded-2xl p-8 bg-black/20 border border-white/5 space-y-6">
         <h3 className="text-xl font-semibold text-white">Inteligencia Artificial (Copiloto)</h3>
         <p className="text-xs text-gray-400">
-          Para que la IA genere respuestas sugeridas, necesitas proporcionar una clave API de OpenAI.
+          Para que la IA genere respuestas sugeridas en la bandeja de entrada, necesitas proporcionar una clave API de OpenAI.
         </p>
         <div className="space-y-4">
           <input 
@@ -192,14 +213,18 @@ export default function Settings() {
             placeholder="OpenAI API Key (sk-...)" 
             className="w-full bg-white/5 border border-white/10 p-3 rounded-xl text-white" 
           />
-          <button 
-            onClick={handleSave} 
-            disabled={saving}
-            className="px-6 py-2.5 bg-[#D9A21B] text-black font-bold rounded-xl disabled:opacity-50 hover:bg-[#C59B27] transition-all flex items-center gap-2"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saving ? 'Guardando...' : 'Guardar Configuración'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={handleSaveOpenAI} 
+              disabled={savingAi}
+              className="px-6 py-2.5 bg-[#D9A21B] text-black font-bold rounded-xl disabled:opacity-50 hover:bg-[#C59B27] transition-all flex items-center gap-2"
+            >
+              {savingAi ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {savingAi ? 'Guardando...' : 'Guardar API Key OpenAI'}
+            </button>
+            {saveAiStatus === 'success' && <span className="text-xs text-emerald-400">✅ ¡Guardado!</span>}
+            {saveAiStatus === 'error' && <span className="text-xs text-red-400">❌ Error al guardar</span>}
+          </div>
         </div>
       </div>
     </div>
