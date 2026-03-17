@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, User, Phone, MessageSquare, Plus, Loader2 } from 'lucide-react';
+import { X, User, Phone, MessageSquare, Plus, Loader2, Send } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface NewChatModalProps {
