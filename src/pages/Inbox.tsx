@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles, UserCheck, X as XIcon, Calendar, Clock, ClipboardCheck, Zap, Phone, Mail, Building2, History } from 'lucide-react';
+import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles, UserCheck, X as XIcon, Calendar, Clock, ClipboardCheck, Zap, Phone, Mail, Building2, History, DollarSign, TrendingUp, CheckCircle2, Award } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
@@ -395,6 +395,9 @@ export default function Inbox() {
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
                     {(lead.status || 'nuevo').replace('_', ' ')}
                   </span>
+                  {lead.priority === 'alta' && (
+                    <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" title="Prioridad Alta" />
+                  )}
                 </div>
                 {lead.assignee_id && (
                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
@@ -495,9 +498,32 @@ export default function Inbox() {
                 </div>
               )}
               {isAiEnabled && !isGeneratingAi && aiSuggestions.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto mb-3 pb-1">
+                <div className="flex gap-2 overflow-x-auto mb-3 pb-1 no-scrollbar">
+                  <div className="flex items-center gap-2 pr-2 border-r border-white/10">
+                    <button 
+                      type="button"
+                      onClick={() => setNewMessage("Estimado cliente, le adjunto nuestro catálogo de cortes premium Altepsa para esta semana. ¿Gusta que le cotice algún peso específico?")}
+                      className="px-3 py-1.5 rounded-lg text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-emerald-500/20 transition-all"
+                    >
+                      <Zap className="h-3 w-3" /> Catálogo
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewMessage("Hola, claro que sí. Para esta picaña/ribeye el precio por kilo hoy es de $... ¿Cuántos kilos desea apartar?")}
+                      className="px-3 py-1.5 rounded-lg text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-blue-500/20 transition-all"
+                    >
+                      <DollarSign className="h-3 w-3" /> Cotizar
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewMessage("Confirmamos su pedido para entrega el día de mañana. ¿Su dirección sigue siendo la misma?")}
+                      className="px-3 py-1.5 rounded-lg text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-purple-500/20 transition-all"
+                    >
+                      <CheckCircle2 className="h-3 w-3" /> Entrega
+                    </button>
+                  </div>
                   {aiSuggestions.map((s, i) => (
-                    <button key={i} onClick={() => setNewMessage(String(s || ''))} className="px-3 py-1.5 rounded-lg text-xs bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 whitespace-nowrap">
+                    <button key={i} onClick={() => setNewMessage(String(s || ''))} className="px-3 py-1.5 rounded-lg text-[10px] bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 whitespace-nowrap hover:bg-[#D9A21B]/20 transition-all">
                       {s}
                     </button>
                   ))}
@@ -554,6 +580,65 @@ export default function Inbox() {
                   </div>
                 </div>
 
+                {/* BUSINESS VALUE & PROGRESS */}
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                       <label className="text-[10px] text-gray-400 uppercase font-black tracking-widest flex items-center gap-1.5">
+                          <DollarSign className="h-3 w-3 text-emerald-400" /> Valor Estimado
+                       </label>
+                       <span className="text-[10px] font-bold text-gray-500">$ MXN</span>
+                    </div>
+                    <input 
+                      type="number"
+                      value={selectedLead.deal_value || ''}
+                      onChange={(e) => handleUpdateLeadField('deal_value', parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className="w-full bg-black/20 border border-white/5 rounded-xl py-2 px-3 text-sm text-emerald-400 font-bold outline-none focus:ring-1 focus:ring-emerald-400/30 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                       <label className="text-[10px] text-gray-400 uppercase font-black tracking-widest flex items-center gap-1.5">
+                          <TrendingUp className="h-3 w-3 text-[#D9A21B]" /> Potencial de Venta
+                       </label>
+                       <span className="text-[10px] font-black text-[#D9A21B]">
+                          {selectedLead.status === 'cerrado_ganado' ? '100%' : selectedLead.status === 'en_progreso' ? '65%' : '20%'}
+                       </span>
+                    </div>
+                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
+                       <motion.div 
+                          initial={{ width: 0 }}
+                          animate={{ width: selectedLead.status === 'cerrado_ganado' ? '100%' : selectedLead.status === 'en_progreso' ? '65%' : '20%' }}
+                          className={`h-full rounded-full ${selectedLead.status === 'cerrado_ganado' ? 'bg-emerald-500' : 'bg-[#D9A21B]'}`}
+                       />
+                    </div>
+                  </div>
+                </div>
+
+                {/* PRIORITY SELECTOR */}
+                <div>
+                   <label className="block text-[10px] text-gray-500 uppercase font-black tracking-widest mb-3">Prioridad del Negocio</label>
+                   <div className="flex gap-2">
+                      {['baja', 'media', 'alta'].map(p => (
+                        <button 
+                          key={p}
+                          onClick={() => handleUpdateLeadField('priority', p)}
+                          className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all ${
+                            selectedLead.priority === p 
+                              ? p === 'alta' ? 'bg-red-500/20 border-red-500/40 text-red-500' 
+                                : p === 'media' ? 'bg-blue-500/20 border-blue-500/40 text-blue-500'
+                                : 'bg-gray-500/20 border-gray-500/40 text-gray-400'
+                              : 'bg-white/5 border-white/5 text-gray-500 hover:bg-white/10'
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      ))}
+                   </div>
+                </div>
+
                 {/* CRM SUMMARY */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
@@ -563,8 +648,8 @@ export default function Inbox() {
                   <textarea 
                     value={selectedLead.summary || ''}
                     onChange={(e) => handleUpdateLeadField('summary', e.target.value)}
-                    placeholder="Lo que busca el cliente, preferencias, cortes favoritos..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-[#D9A21B]/50 min-h-[100px] resize-none leading-relaxed"
+                    placeholder="Lo que busca el cliente, cortes favoritos..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-[#D9A21B]/50 min-h-[80px] resize-none leading-relaxed"
                   />
                 </div>
 
