@@ -1,0 +1,10 @@
+node_modules
+dist
+build
+.git
+.gitignore
+*.log
+service-account.json
+firebase-applet-config.json
+*.txt
+*.tsbuildinfo
