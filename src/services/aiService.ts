@@ -75,3 +75,67 @@ export async function generateSuggestedReplies(messages: any[], leadInfo: any) {
     return ["Debes confirmar que tu OpenAI API key es válida e intentar de nuevo."];
   }
 }
+
+export async function summarizeConversation(messages: any[]) {
+  let apiKey = '';
+  try {
+    const { data } = await supabase.from('settings').select('value').eq('key', 'openai_api').single();
+    if (data?.value?.apiKey) apiKey = data.value.apiKey;
+  } catch (error) {}
+
+  if (!apiKey || messages.length === 0) return null;
+
+  const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+  const conversationContext = messages.map(m => `${m.sender_id === 'client' ? 'Cliente' : 'Agente'}: ${m.content}`).join('\n');
+
+  const prompt = `Analiza esta conversación de WhatsApp de una comercializadora de carnes y genera un RESUMEN EJECUTIVO MUY CORTO (máximo 40 palabras) sobre qué busca el cliente, qué cortes le interesan y en qué estado quedó la negociación.
+  
+  Conversación:
+  ${conversationContext}
+  
+  Devuelve el resultado en formato JSON: { "summary": "..." }`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" }
+    });
+    const parsed = JSON.parse(response.choices[0].message.content || '{}');
+    return parsed.summary || null;
+  } catch (error) {
+    console.error("Error summarizing:", error);
+    return null;
+  }
+}
+
+export async function suggestTags(messages: any[]) {
+  let apiKey = '';
+  try {
+    const { data } = await supabase.from('settings').select('value').eq('key', 'openai_api').single();
+    if (data?.value?.apiKey) apiKey = data.value.apiKey;
+  } catch (error) {}
+
+  if (!apiKey || messages.length === 0) return [];
+
+  const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+  const conversationContext = messages.map(m => m.content).join(' ');
+
+  const prompt = `Analiza la conversación y sugiere etiquetas (tags) de máximo 2 palabras para categorizar a este cliente de una carnicería/comercializadora. Ejemplo: "Mayorista", "Restaurante", "Interesado en Ribeye", "Preguntó Precios".
+  
+  Texto: ${conversationContext}
+  
+  Devuelve un array JSON de máximo 4 etiquetas: { "tags": ["tag1", "tag2"...] }`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" }
+    });
+    const parsed = JSON.parse(response.choices[0].message.content || '{}');
+    return parsed.tags || [];
+  } catch (error) {
+    return [];
+  }
+}

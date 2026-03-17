@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Search, Filter, Building2, DollarSign, AlertCircle, User } from 'lucide-react';
+import { Plus, Search, Filter, MoreHorizontal, User, Mail, Phone, Calendar, Trash2, Edit2, LayoutGrid, CheckCircle2, XCircle, Clock, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
@@ -189,9 +189,12 @@ export default function Leads() {
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="text-sm font-bold text-white truncate">{lead.name}</h4>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20">
-                      {lead.source}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {lead.summary && <Sparkles className="h-3 w-3 text-[#D9A21B] animate-pulse" />}
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20">
+                        {lead.source}
+                      </span>
+                    </div>
                   </div>
                   <p className="text-xs text-gray-400 mb-2">{lead.phone}</p>
                   

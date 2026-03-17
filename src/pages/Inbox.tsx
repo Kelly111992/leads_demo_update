@@ -5,7 +5,7 @@ import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, Panel
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
-import { generateSuggestedReplies } from '../services/aiService';
+import { generateSuggestedReplies, summarizeConversation, suggestTags } from '../services/aiService';
 
 export default function Inbox() {
   const { userProfile } = useAuth();
@@ -30,6 +30,8 @@ export default function Inbox() {
   const [isAiPopulated, setIsAiPopulated] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [isTagging, setIsTagging] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'lead' | 'message' | 'messages' | 'system' } | null>(null);
 
   useEffect(() => {
@@ -95,6 +97,29 @@ export default function Inbox() {
     } finally {
       setIsGeneratingAi(false);
     }
+  };
+
+  // AI Helpers
+  const handleAutoSummarize = async () => {
+    if (!selectedLeadId || messages.length === 0) return;
+    setIsSummarizing(true);
+    const summary = await summarizeConversation(messages);
+    if (summary) {
+      await handleUpdateLeadField('summary', summary);
+    }
+    setIsSummarizing(false);
+  };
+
+  const handleSuggestTags = async () => {
+    if (!selectedLeadId || messages.length === 0) return;
+    setIsTagging(true);
+    const suggested = await suggestTags(messages);
+    if (suggested.length > 0) {
+      const currentTags = leads.find(l => l.id === selectedLeadId)?.tags || [];
+      const newTags = Array.from(new Set([...currentTags, ...suggested]));
+      await handleUpdateLeadField('tags', newTags);
+    }
+    setIsTagging(false);
   };
 
   // Lead real-time subscription
@@ -395,6 +420,9 @@ export default function Inbox() {
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
                     {(lead.status || 'nuevo').replace('_', ' ')}
                   </span>
+                  {lead.summary && (
+                    <Sparkles className="h-3 w-3 text-[#D9A21B] animate-pulse" />
+                  )}
                 </div>
                 {lead.assignee_id && (
                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
@@ -579,21 +607,41 @@ export default function Inbox() {
 
                 {/* CRM SUMMARY */}
                 <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <ClipboardCheck className="h-3.5 w-3.5 text-[#D9A21B]" />
-                    <label className="text-[10px] text-gray-300 uppercase font-black tracking-widest">Resumen del Cliente</label>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                       <ClipboardCheck className="h-3.5 w-3.5 text-[#D9A21B]" />
+                       <label className="text-[10px] text-gray-300 uppercase font-black tracking-widest">Resumen de Negocio</label>
+                    </div>
+                    <button 
+                      onClick={handleAutoSummarize}
+                      disabled={isSummarizing || messages.length === 0}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-[#D9A21B]/10 text-[#D9A21B] text-[9px] font-black uppercase tracking-widest hover:bg-[#D9A21B]/20 transition-all disabled:opacity-50"
+                    >
+                       {isSummarizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                       IA Mágica
+                    </button>
                   </div>
                   <textarea 
                     value={selectedLead.summary || ''}
                     onChange={(e) => handleUpdateLeadField('summary', e.target.value)}
-                    placeholder="Lo que busca el cliente, cortes favoritos..."
+                    placeholder="Genera un resumen con IA para no perder detalles..."
                     className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-[#D9A21B]/50 min-h-[100px] resize-none leading-relaxed"
                   />
                 </div>
 
                 {/* ETIQUETAS */}
                 <div>
-                  <label className="block text-[10px] text-gray-500 uppercase font-black tracking-widest mb-3">Etiquetas de Canal</label>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-[10px] text-gray-500 uppercase font-black tracking-widest">Etiquetas Inteligentes</label>
+                    <button 
+                      onClick={handleSuggestTags}
+                      disabled={isTagging || messages.length === 0}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/10 text-blue-400 text-[9px] font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all disabled:opacity-50"
+                    >
+                       {isTagging ? <Loader2 className="h-3 w-3 animate-spin" /> : <Bot className="h-3 w-3" />}
+                       Sugerir Tags
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {selectedLead.tags?.map((t: string) => (
                       <span key={t} className="px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 text-[10px] font-bold flex items-center gap-1.5 border border-white/10">
