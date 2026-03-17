@@ -616,41 +616,69 @@ export default function Inbox() {
             </div>
 
             <div className="p-4 bg-black/20 border-t border-white/10">
-              {isAiEnabled && isGeneratingAi && (
+              {isGeneratingAi && (
                 <div className="text-xs text-[#D9A21B] flex items-center gap-2 mb-3">
                   <Loader2 className="h-3 w-3 animate-spin"/> Leyendo contexto de la conversación...
                 </div>
               )}
+              {/* AI Suggestions (when Copilot ON) */}
               {isAiEnabled && !isGeneratingAi && aiSuggestions.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto mb-3 pb-1 no-scrollbar">
-                  <div className="flex items-center gap-2 pr-2 border-r border-white/10">
-                    <button 
-                      type="button"
-                      onClick={() => setNewMessage("Estimado cliente, le adjunto nuestro catálogo de cortes premium Altepsa para esta semana. ¿Gusta que le cotice algún peso específico?")}
-                      className="px-3 py-1.5 rounded-lg text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-emerald-500/20 transition-all"
-                    >
-                      <Zap className="h-3 w-3" /> Catálogo
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setNewMessage("Hola, claro que sí. Para esta picaña/ribeye el precio por kilo hoy es de $... ¿Cuántos kilos desea apartar?")}
-                      className="px-3 py-1.5 rounded-lg text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-blue-500/20 transition-all"
-                    >
-                      <DollarSign className="h-3 w-3" /> Cotizar
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => setNewMessage("Confirmamos su pedido para entrega el día de mañana. ¿Su dirección sigue siendo la misma?")}
-                      className="px-3 py-1.5 rounded-lg text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-purple-500/20 transition-all"
-                    >
-                      <CheckCircle2 className="h-3 w-3" /> Entrega
-                    </button>
-                  </div>
                   {aiSuggestions.map((s, i) => (
                     <button key={i} onClick={() => setNewMessage(String(s || ''))} className="px-3 py-1.5 rounded-lg text-[10px] bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 whitespace-nowrap hover:bg-[#D9A21B]/20 transition-all">
                       {s}
                     </button>
                   ))}
+                </div>
+              )}
+              {/* Fixed Templates (when Copilot OFF) */}
+              {!isAiEnabled && (
+                <div className="mb-3">
+                  <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-2">Plantillas Rápidas</p>
+                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar flex-wrap">
+                    <button 
+                      type="button"
+                      onClick={() => setNewMessage("¡Hola! Buen día, te saluda el equipo de Altepsa. ¿En qué te podemos ayudar el día de hoy?")}
+                      className="px-3 py-1.5 rounded-lg text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-emerald-500/20 transition-all"
+                    >
+                      <MessageSquare className="h-3 w-3" /> Saludo
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewMessage("Con gusto te comparto nuestro catálogo de cortes premium. Manejamos Ribeye, Picaña, Arrachera, T-Bone y más. ¿Qué corte te interesa?")}
+                      className="px-3 py-1.5 rounded-lg text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-blue-500/20 transition-all"
+                    >
+                      <Zap className="h-3 w-3" /> Catálogo
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewMessage("Claro, con todo gusto. El precio por kilo de ese corte el día de hoy es de $___. ¿Cuántos kilos le apartamos?")}
+                      className="px-3 py-1.5 rounded-lg text-[10px] bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-[#D9A21B]/20 transition-all"
+                    >
+                      <DollarSign className="h-3 w-3" /> Cotización
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewMessage("Perfecto, confirmamos tu pedido. La entrega sería el día de mañana. ¿Nos confirmas tu dirección para el envío?")}
+                      className="px-3 py-1.5 rounded-lg text-[10px] bg-purple-500/10 text-purple-400 border border-purple-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-purple-500/20 transition-all"
+                    >
+                      <CheckCircle2 className="h-3 w-3" /> Entrega
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewMessage("Hola, ¿cómo te fue con tu último pedido? Queremos asegurarnos de que todo haya llegado en excelentes condiciones. ¿Te gustaría hacer un nuevo pedido esta semana?")}
+                      className="px-3 py-1.5 rounded-lg text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-cyan-500/20 transition-all"
+                    >
+                      <Clock className="h-3 w-3" /> Seguimiento
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => setNewMessage("🔥 ¡Promo de la semana! Este fin de semana tenemos un descuento especial en cortes selectos. Pide ahora y aparta tu pedido con precio preferencial.")}
+                      className="px-3 py-1.5 rounded-lg text-[10px] bg-red-500/10 text-red-400 border border-red-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-red-500/20 transition-all"
+                    >
+                      <TrendingUp className="h-3 w-3" /> Promoción
+                    </button>
+                  </div>
                 </div>
               )}
               <form onSubmit={handleSendMessage} className="flex gap-2">
