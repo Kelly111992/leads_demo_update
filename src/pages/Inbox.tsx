@@ -395,9 +395,6 @@ export default function Inbox() {
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
                     {(lead.status || 'nuevo').replace('_', ' ')}
                   </span>
-                  {lead.priority === 'alta' && (
-                    <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" title="Prioridad Alta" />
-                  )}
                 </div>
                 {lead.assignee_id && (
                   <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10">
@@ -578,93 +575,6 @@ export default function Inbox() {
                     <p className="text-[9px] text-gray-500 uppercase font-black mb-1">Fuente</p>
                     <p className="text-xs text-white font-bold">{selectedLead.source || 'WhatsApp'}</p>
                   </div>
-                </div>
-
-                {/* BUSINESS VALUE & PROGRESS */}
-                <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-4">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                       <label className="text-[10px] text-gray-400 uppercase font-black tracking-widest flex items-center gap-1.5">
-                          <DollarSign className="h-3 w-3 text-emerald-400" /> Valor Estimado
-                       </label>
-                       <span className="text-[10px] font-bold text-gray-500">$ MXN</span>
-                    </div>
-                    <input 
-                      type="number"
-                      value={selectedLead.deal_value || ''}
-                      onChange={(e) => handleUpdateLeadField('deal_value', parseFloat(e.target.value) || 0)}
-                      placeholder="0.00"
-                      className="w-full bg-black/20 border border-white/5 rounded-xl py-2 px-3 text-sm text-emerald-400 font-bold outline-none focus:ring-1 focus:ring-emerald-400/30 transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                       <label className="text-[10px] text-gray-400 uppercase font-black tracking-widest flex items-center gap-1.5">
-                          <TrendingUp className="h-3 w-3 text-[#D9A21B]" /> Potencial de Venta
-                       </label>
-                       <span className="text-[10px] font-black text-[#D9A21B]">
-                          {selectedLead.status === 'cerrado_ganado' ? '100%' : selectedLead.status === 'en_progreso' ? '65%' : '20%'}
-                       </span>
-                    </div>
-                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
-                       <motion.div 
-                          initial={{ width: 0 }}
-                          animate={{ width: selectedLead.status === 'cerrado_ganado' ? '100%' : selectedLead.status === 'en_progreso' ? '65%' : '20%' }}
-                          className={`h-full rounded-full ${selectedLead.status === 'cerrado_ganado' ? 'bg-emerald-500' : 'bg-[#D9A21B]'}`}
-                       />
-                    </div>
-                  </div>
-                </div>
-
-                {/* PRIORITY SELECTOR */}
-                <div>
-                   <label className="block text-[10px] text-gray-500 uppercase font-black tracking-widest mb-3">Prioridad del Negocio</label>
-                   <div className="flex gap-2">
-                      {['baja', 'media', 'alta'].map(p => (
-                        <button 
-                          key={p}
-                          onClick={() => handleUpdateLeadField('priority', p)}
-                          className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter border transition-all ${
-                            selectedLead.priority === p 
-                              ? p === 'alta' ? 'bg-red-500/20 border-red-500/40 text-red-500' 
-                                : p === 'media' ? 'bg-blue-500/20 border-blue-500/40 text-blue-500'
-                                : 'bg-gray-500/20 border-gray-500/40 text-gray-400'
-                              : 'bg-white/5 border-white/5 text-gray-500 hover:bg-white/10'
-                          }`}
-                        >
-                          {p}
-                        </button>
-                      ))}
-                   </div>
-                </div>
-
-                {/* CRM SUMMARY */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <ClipboardCheck className="h-3.5 w-3.5 text-[#D9A21B]" />
-                    <label className="text-[10px] text-gray-300 uppercase font-black tracking-widest">Resumen del Cliente</label>
-                  </div>
-                  <textarea 
-                    value={selectedLead.summary || ''}
-                    onChange={(e) => handleUpdateLeadField('summary', e.target.value)}
-                    placeholder="Lo que busca el cliente, cortes favoritos..."
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-[#D9A21B]/50 min-h-[80px] resize-none leading-relaxed"
-                  />
-                </div>
-
-                {/* NEXT STEPS */}
-                <div>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Zap className="h-3.5 w-3.5 text-orange-400" />
-                    <label className="text-[10px] text-gray-300 uppercase font-black tracking-widest">Próximos Pasos</label>
-                  </div>
-                  <input 
-                    value={selectedLead.next_step || ''}
-                    onChange={(e) => handleUpdateLeadField('next_step', e.target.value)}
-                    placeholder="Ej: Enviar cotización de Ribeye lunes"
-                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-orange-400 font-medium outline-none focus:ring-1 focus:ring-orange-400/50"
-                  />
                 </div>
 
                 {/* ETIQUETAS */}
