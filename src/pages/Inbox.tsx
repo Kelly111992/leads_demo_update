@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles, UserCheck, X as XIcon, Calendar, Clock, ClipboardCheck, Zap, Phone, Mail, Building2, History, DollarSign, TrendingUp, CheckCircle2, Award, CalendarDays } from 'lucide-react';
+import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles, UserCheck, X as XIcon, Calendar, Clock, ClipboardCheck, Zap, Phone, Mail, Building2, History, DollarSign, TrendingUp, CheckCircle2, Award, CalendarDays, MessageSquarePlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import { generateSuggestedReplies, summarizeConversation, suggestTags } from '../services/aiService';
+import { NewChatModal } from '../components/NewChatModal';
 
 export default function Inbox() {
   const { userProfile } = useAuth();
@@ -33,6 +34,7 @@ export default function Inbox() {
   const [isTyping, setIsTyping] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isTagging, setIsTagging] = useState(false);
+  const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'lead' | 'message' | 'messages' | 'system' } | null>(null);
 
   useEffect(() => {
@@ -303,6 +305,69 @@ export default function Inbox() {
     }
   };
 
+  const handleCreateChat = async (data: { name: string; phone: string; message: string }) => {
+    if (!userProfile) return;
+    try {
+      const cleanPhone = data.phone.replace(/\D/g, '');
+      const newLeadId = `wa_${cleanPhone}`;
+      const now = new Date().toISOString();
+
+      // Upsert Lead
+      const { error: leadError } = await supabase.from('leads').upsert([{
+        id: newLeadId,
+        name: data.name,
+        phone: cleanPhone,
+        source: 'whatsapp',
+        status: 'en_progreso',
+        assignee_id: userProfile.uid,
+        system_token: 'claveai',
+        created_at: now,
+        updated_at: now,
+        last_contact_at: now
+      }], { onConflict: 'id' });
+
+      if (leadError) throw leadError;
+
+      // Insert Initial Message
+      const messageId = `msg_${Date.now()}`;
+      const { error: msgError } = await supabase.from('messages').insert([{
+        id: messageId,
+        lead_id: newLeadId,
+        sender_id: userProfile.uid,
+        content: data.message,
+        timestamp: now,
+        system_token: 'claveai'
+      }]);
+
+      if (msgError) throw msgError;
+
+      // Send via Evolution API
+      const response = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone, text: data.message })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.evolutionId) {
+          await supabase.from('messages').update({ evolution_id: result.evolutionId }).eq('id', messageId);
+        }
+      }
+
+      // Update state and select the new lead
+      await fetchLeads(); // refresh the list
+      setSelectedLeadId(newLeadId);
+      
+      // Optionally pre-fill messages since fetchLeads is async but subscriptions should catch it
+      // Let the subscription or effect handle it, just triggering fetchLeads is enough as it's quick.
+
+    } catch (error) {
+      console.error("Error creating new chat:", error);
+      throw error;
+    }
+  };
+
   const handleAssignAgent = async (agentId: string) => {
     await handleUpdateLeadField('assignee_id', agentId);
   };
@@ -384,15 +449,24 @@ export default function Inbox() {
         <div className="p-4 border-b border-white/10 bg-white/5">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-white tracking-tight">Bandeja de Entrada</h2>
-            {userProfile?.role === 'admin' && (
+            <div className="flex gap-2">
               <button
-                onClick={() => setConfirmDelete({ id: 'all', type: 'messages' })}
-                className="inline-flex items-center px-3 py-1.5 rounded-xl bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 hover:bg-[#D9A21B]/20 transition-all text-[10px] font-black uppercase tracking-[0.1em] gap-2 shadow-lg shadow-[#D9A21B]/5"
+                onClick={() => setIsNewChatModalOpen(true)}
+                title="Nuevo Mensaje"
+                className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 hover:bg-[#D9A21B]/20 transition-all shadow-lg shadow-[#D9A21B]/5"
               >
-                <Eraser className="h-3.5 w-3.5" />
-                Limpiar
+                <MessageSquarePlus className="h-4 w-4" />
               </button>
-            )}
+              {userProfile?.role === 'admin' && (
+                <button
+                  onClick={() => setConfirmDelete({ id: 'all', type: 'messages' })}
+                  title="Limpiar"
+                  className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all shadow-lg"
+                >
+                  <Eraser className="h-4 w-4" />
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex flex-col gap-3">
             <div className="relative">
@@ -870,6 +944,12 @@ export default function Inbox() {
           </div>
         )}
       </AnimatePresence>
+
+      <NewChatModal
+        isOpen={isNewChatModalOpen}
+        onClose={() => setIsNewChatModalOpen(false)}
+        onSend={handleCreateChat}
+      />
 
       {/* Confirmation Modal */}
       {confirmDelete && (
