@@ -1,7 +1,6 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
-import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 import SmeeClient from 'smee-client';
@@ -11,61 +10,32 @@ let EVOLUTION_URL = 'https://link-inmobiliario-evolution-api.hfsosq.easypanel.ho
 let INSTANCE = 'leads_test';
 let API_KEY = '429683C4C977415CAAFCCE10F7D57E11';
 
-// Load Firebase config
-let firebaseConfig: any;
-let db: any;
+// Supabase Setup
+const supabaseUrl = process.env.SUPABASE_URL || 'https://rlgjxxjfxirbyhfsztzr.supabase.co';
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'sb_publishable_e_Hu4ROvwlGJJs4EhTMYiQ_Vw8g5wAd';
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-try {
-  const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
-  const serviceAccountPath = path.resolve(process.cwd(), 'service-account.json');
-  
-  let configData: any;
-  let serviceAccountData: any;
-
-  // Prioridad 1: Variables de Entorno (Ideal para Docker/Easypanel)
-  if (process.env.FIREBASE_CONFIG && process.env.FIREBASE_SERVICE_ACCOUNT) {
-    configData = JSON.parse(process.env.FIREBASE_CONFIG);
-    serviceAccountData = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-    console.log('📦 Configuración de Firebase cargada desde Variables de Entorno');
-  } 
-  // Prioridad 2: Archivos Locales (Ideal para Desarrollo)
-  else if (fs.existsSync(configPath) && fs.existsSync(serviceAccountPath)) {
-    configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    serviceAccountData = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-    console.log('📂 Configuración de Firebase cargada desde archivos locales');
-  }
-
-  if (configData && serviceAccountData) {
-    firebaseConfig = configData;
-
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccountData),
-        projectId: firebaseConfig.projectId
-      });
-    }
-
-    db = getFirestore(admin.app(), firebaseConfig.firestoreDatabaseId);
-    console.log('🚀 Firebase ADMIN inicializado para el proyecto:', firebaseConfig.projectId);
-    console.log('✅ Conectado a base de datos:', firebaseConfig.firestoreDatabaseId || '(default)');
-  } else {
-    console.error('CRITICAL: Firebase configuration missing (check env vars FIREBASE_CONFIG/FIREBASE_SERVICE_ACCOUNT or local JSON files)');
-  }
-} catch (error) {
-  console.error('Error initializing Firebase Admin:', error);
-}
+console.log('🚀 Supabase cliente inicializado:', supabaseUrl);
 
 async function fetchEvolutionConfig() {
-  if (!db) return;
   try {
-    const docRef = db.collection('settings').doc('evolution_api');
-    const docSnap = await docRef.get();
-    if (docSnap.exists) {
-      const data = docSnap.data();
-      if (data.apiUrl) EVOLUTION_URL = data.apiUrl;
-      if (data.instance) INSTANCE = data.instance;
-      if (data.apiKey) API_KEY = data.apiKey;
-      console.log('Loaded Evolution API config from Firestore');
+    const { data, error } = await supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'evolution_api')
+      .single();
+
+    if (error) {
+      if (error.code !== 'PGRST116') console.error('Error fetching Evolution API config:', error);
+      return;
+    }
+
+    if (data && data.value) {
+      const config = data.value;
+      if (config.apiUrl) EVOLUTION_URL = config.apiUrl;
+      if (config.instance) INSTANCE = config.instance;
+      if (config.apiKey) API_KEY = config.apiKey;
+      console.log('Loaded Evolution API config from Supabase');
     }
   } catch (error) {
     console.error('Error fetching Evolution API config:', error);
@@ -73,10 +43,6 @@ async function fetchEvolutionConfig() {
 }
 
 async function setupEvolutionWebhook() {
-  if (!db) {
-    console.error('Skipping webhook setup: No Firestore DB');
-    return;
-  }
   await fetchEvolutionConfig();
   
   // Use Smee.io for development environment, or app URL for production
@@ -173,57 +139,58 @@ async function startServer() {
 
             console.log(`Processing message from ${pushName}: ${content}`);
 
-            // 1. Identify Lead ID (based on phone)
             const leadId = `wa_${phone}`;
-
-            // 2. Prepare Message Data
             const messageId = `msg_${Date.now()}`;
-            const messageDataLocal = {
-              leadId,
-              senderId: 'client',
-              content: content,
-              timestamp: new Date().toISOString(),
-              systemToken: 'claveai'
-            };
 
             try {
-              if (db) {
-                // Get existing lead to preserve createdAt
-                const leadDoc = await db.collection('leads').doc(leadId).get();
-                const createdAt = leadDoc.exists ? leadDoc.data().createdAt : new Date().toISOString();
+              // 1. Upsert Lead (Supabase style)
+              const { data: leadExists } = await supabase
+                .from('leads')
+                .select('created_at')
+                .eq('id', leadId)
+                .single();
 
-                const leadData = {
-                  name: pushName,
-                  phone: phone,
-                  source: 'whatsapp',
-                  status: 'new',
-                  updatedAt: new Date().toISOString(),
-                  createdAt: createdAt,
-                  systemToken: 'claveai'
-                };
+              const leadData = {
+                id: leadId,
+                name: pushName,
+                phone: phone,
+                source: 'whatsapp',
+                status: 'new',
+                updated_at: new Date().toISOString(),
+                created_at: leadExists ? leadExists.created_at : new Date().toISOString(),
+                system_token: 'claveai'
+              };
 
-                console.log(`💾 Guardando lead ${leadId} (${pushName})...`);
-                await db.collection('leads').doc(leadId).set(leadData, { merge: true });
-                
-                console.log(`✉️ Guardando mensaje para el lead ${leadId}...`);
-                await db.collection('messages').doc(messageId).set(messageDataLocal);
+              console.log(`💾 Guardando lead ${leadId} (${pushName})...`);
+              await supabase.from('leads').upsert([leadData]);
+              
+              // 2. Insert Message
+              console.log(`✉️ Guardando mensaje para el lead ${leadId}...`);
+              await supabase.from('messages').insert([{
+                id: messageId,
+                lead_id: leadId,
+                sender_id: 'client',
+                content: content,
+                timestamp: new Date().toISOString(),
+                system_token: 'claveai'
+              }]);
 
-                // Mark event as processed
-                const eventId = payload.data.key?.id || `evt_${Date.now()}`;
-                await db.collection('webhook_events').doc(eventId).set({
-                  payload: payload,
-                  processed: true,
-                  processedAt: new Date().toISOString(),
-                  status: 'processed',
-                  systemToken: 'claveai'
-                }, { merge: true });
-                
-                recentWebhooks[0].firestoreStatus = 'success';
-              }
-            } catch (fsError: any) {
-              console.error('❌ Error de Firestore:', fsError.message);
-              recentWebhooks[0].firestoreStatus = 'error';
-              recentWebhooks[0].firestoreError = fsError.message;
+              // 3. Mark event as processed
+              const eventId = payload.data.key?.id || `evt_${Date.now()}`;
+              await supabase.from('webhook_events').upsert([{
+                id: eventId,
+                payload: payload,
+                processed: true,
+                processed_at: new Date().toISOString(),
+                status: 'processed',
+                system_token: 'claveai'
+              }]);
+              
+              recentWebhooks[0].supabaseStatus = 'success';
+            } catch (sbError: any) {
+              console.error('❌ Error de Supabase:', sbError.message);
+              recentWebhooks[0].supabaseStatus = 'error';
+              recentWebhooks[0].supabaseError = sbError.message;
             }
           }
         }

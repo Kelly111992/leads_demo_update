@@ -19,7 +19,6 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <WebhookProcessor />
         <Router>
           <Routes>
             <Route path="/login" element={<Login />} />

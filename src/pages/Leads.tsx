@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { collection, onSnapshot, query, where, doc, updateDoc, addDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Search, Filter, Building2, DollarSign, Trash2, AlertCircle } from 'lucide-react';
+import { Plus, Search, Filter, Building2, DollarSign, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
@@ -18,29 +17,49 @@ export default function Leads() {
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'lead' | 'messages' | 'system' } | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  useEffect(() => {
+  const fetchLeads = async () => {
     if (!userProfile) return;
-
-    let q: any = collection(db, 'leads');
+    
+    let query = supabase.from('leads').select('*');
     if (userProfile.role === 'agent') {
-      q = query(q, where('assigneeId', '==', userProfile.uid));
+      query = query.eq('assignee_id', userProfile.uid);
     }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const newLeads = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setLeads(newLeads);
-      setLoading(false);
-    });
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) {
+      console.error("Error fetching leads:", error);
+    } else {
+      setLeads(data || []);
+    }
+    setLoading(false);
+  };
 
-    return unsubscribe;
+  useEffect(() => {
+    fetchLeads();
+
+    const channel = supabase
+      .channel('public:leads')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, () => {
+        fetchLeads();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userProfile]);
 
   const handleStatusChange = async (leadId: string, newStatus: string) => {
     try {
-      await updateDoc(doc(db, 'leads', leadId), {
-        status: newStatus,
-        updatedAt: new Date().toISOString()
-      });
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', leadId);
+      
+      if (error) throw error;
     } catch (error) {
       console.error("Error updating status:", error);
     }
@@ -48,25 +67,26 @@ export default function Leads() {
 
   const handleAddLead = async (leadData: { name: string; company: string; phone: string; email: string }) => {
     try {
-      await addDoc(collection(db, 'leads'), {
-        ...leadData,
-        source: 'whatsapp',
-        status: 'nuevo',
-        assigneeId: userProfile?.uid,
-        tags: [],
-        notes: '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
+      const { error } = await supabase
+        .from('leads')
+        .insert([{
+          ...leadData,
+          id: `wa_${leadData.phone}`,
+          source: 'whatsapp',
+          status: 'nuevo',
+          assignee_id: userProfile?.uid,
+          tags: [],
+          notes: '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          system_token: 'claveai'
+        }]);
+      
+      if (error) throw error;
     } catch (error) {
       console.error("Error adding lead:", error);
       throw error;
     }
-  };
-
-  const handleDeleteLead = async (leadId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setConfirmDelete({ id: leadId, type: 'lead' });
   };
 
   const handleConfirmDelete = async () => {
@@ -74,52 +94,34 @@ export default function Leads() {
     
     try {
       if (confirmDelete.type === 'lead') {
-        await deleteDoc(doc(db, 'leads', confirmDelete.id));
+        const { error } = await supabase
+          .from('leads')
+          .delete()
+          .eq('id', confirmDelete.id);
+        if (error) throw error;
       } else if (confirmDelete.type === 'messages') {
-        const collectionsToClear = ['messages', 'webhook_events'];
-        for (const colName of collectionsToClear) {
-          const snapshot = await getDocs(collection(db, colName));
-          const batch = writeBatch(db);
-          snapshot.docs.forEach((doc) => {
-            batch.delete(doc.ref);
-          });
-          await batch.commit();
-        }
+        await supabase.from('messages').delete().eq('system_token', 'claveai');
       } else if (confirmDelete.type === 'system') {
-        const collectionsToClear = ['leads', 'messages', 'webhook_events'];
-        for (const colName of collectionsToClear) {
-          const snapshot = await getDocs(collection(db, colName));
-          const batch = writeBatch(db);
-          snapshot.docs.forEach((doc) => {
-            batch.delete(doc.ref);
-          });
-          await batch.commit();
-        }
+        await supabase.from('leads').delete().eq('system_token', 'claveai');
+        await supabase.from('messages').delete().eq('system_token', 'claveai');
       }
       setConfirmDelete(null);
+      fetchLeads();
     } catch (error) {
       console.error("Error in delete operation:", error);
       setConfirmDelete(null);
     }
   };
 
-  const handleClearMessages = async () => {
-    setConfirmDelete({ id: 'all', type: 'messages' });
-  };
-
-  const handleClearSystem = async () => {
-    setConfirmDelete({ id: 'all', type: 'system' });
-  };
-
   const filteredLeads = leads.filter(lead => 
-    lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.phone.includes(searchTerm)
+    lead.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    lead.phone?.includes(searchTerm)
   );
 
   if (loading) return <div className="p-8 text-center text-gray-400">Cargando prospectos...</div>;
 
   return (
-    <div className="h-full flex flex-col p-8 overflow-hidden">
+    <div className="h-full flex flex-col p-8 overflow-hidden bg-transparent">
       <div className="mb-8 flex justify-between items-center">
         <div>
           <h2 className="text-3xl font-bold text-white tracking-tight">Kanban de Prospectos</h2>
@@ -128,7 +130,7 @@ export default function Leads() {
         <div className="flex gap-3">
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex items-center px-5 py-2.5 border border-[#D9A21B]/30 shadow-lg shadow-[#D9A21B]/20 text-sm font-medium rounded-xl text-black bg-[#D9A21B] hover:bg-[#C59B27] transition-all duration-300 hover:-translate-y-0.5"
+            className="inline-flex items-center px-5 py-2.5 bg-[#D9A21B] text-black font-bold rounded-xl shadow-lg shadow-[#D9A21B]/20 transition-all hover:-translate-y-0.5"
           >
             <Plus className="-ml-1 mr-2 h-5 w-5" />
             Añadir Prospecto
@@ -137,37 +139,28 @@ export default function Leads() {
       </div>
 
       <div className="mb-8 flex space-x-4">
-        <div className="flex-1 relative rounded-xl shadow-sm">
+        <div className="flex-1 relative">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
             <Search className="h-5 w-5 text-gray-400" />
           </div>
           <input
             type="text"
-            className="focus:ring-2 focus:ring-[#D9A21B]/50 focus:border-transparent block w-full pl-11 sm:text-sm border-white/10 bg-white/5 text-white placeholder-gray-500 rounded-xl py-3 px-4 outline-none transition-all"
-            placeholder="Buscar prospectos por nombre o teléfono..."
+            className="w-full pl-11 bg-white/5 border border-white/10 text-white rounded-xl py-3 outline-none focus:ring-2 focus:ring-[#D9A21B]/50 transition-all"
+            placeholder="Buscar..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <button className="inline-flex items-center px-5 py-3 border border-white/10 shadow-sm text-sm font-medium rounded-xl text-gray-300 bg-white/5 hover:bg-white/10 transition-all duration-300">
-          <Filter className="-ml-1 mr-2 h-5 w-5 text-gray-400" />
-          Filtros
-        </button>
       </div>
 
       <div className="flex-1 overflow-x-auto flex space-x-6 pb-4">
         {STATUSES.map(status => (
-          <div key={status} className="w-80 flex-shrink-0 flex flex-col glass-panel rounded-2xl overflow-hidden">
-            <div className="p-4 border-b border-white/10 bg-black/20 flex justify-between items-center">
-              <h3 className="text-sm font-semibold text-gray-200 uppercase tracking-wider">
-                {status === 'nuevo' ? 'Nuevo' : 
-                 status === 'asignado' ? 'Asignado' : 
-                 status === 'en_progreso' ? 'En Progreso' : 
-                 status === 'cerrado_ganado' ? 'Ganado' : 
-                 status === 'cerrado_perdido' ? 'Perdido' : 
-                 status.replace('_', ' ')}
+          <div key={status} className="w-80 flex-shrink-0 flex flex-col glass-panel rounded-2xl overflow-hidden border border-white/5 bg-black/20">
+            <div className="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
+              <h3 className="text-sm font-bold text-gray-200 uppercase tracking-widest">
+                {status.replace('_', ' ')}
               </h3>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white/10 text-gray-300 border border-white/5">
+              <span className="px-2 py-0.5 rounded-full text-xs bg-white/10 text-gray-400">
                 {filteredLeads.filter(l => l.status === status).length}
               </span>
             </div>
@@ -178,62 +171,26 @@ export default function Leads() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.05 }}
                   key={lead.id} 
-                  className="bg-white/5 border border-white/10 p-5 rounded-xl shadow-sm hover:shadow-lg hover:bg-white/10 transition-all duration-300 cursor-pointer group"
+                  className="bg-white/5 border border-white/10 p-5 rounded-xl hover:bg-white/10 transition-all cursor-pointer"
                 >
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <div className="min-w-0 pr-2">
-                          <h4 className="text-sm font-medium text-white group-hover:text-[#D9A21B] transition-colors truncate">{lead.name}</h4>
-                          {lead.company && (
-                            <p className="text-[11px] text-gray-400 flex items-center mt-0.5 truncate">
-                              <Building2 className="h-3 w-3 mr-1 flex-shrink-0" />
-                              {lead.company}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium capitalize border flex-shrink-0
-                        ${lead.source === 'whatsapp' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
-                          lead.source === 'facebook' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 'bg-pink-500/10 text-pink-400 border-pink-500/20'}`}>
-                        {lead.source}
-                      </span>
-                    </div>
-                  <p className="text-xs text-gray-500 mb-3">{lead.phone}</p>
-                  
-                  {lead.value && (
-                    <div className="mb-3 flex items-center text-xs font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-md w-fit">
-                      <DollarSign className="h-3 w-3 mr-0.5" />
-                      {lead.value.toLocaleString()}
-                    </div>
-                  )}
-                  
-                  <div className="flex flex-wrap gap-1.5 mb-4">
-                    {lead.tags?.map((tag: string) => (
-                      <span key={tag} className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-[#D9A21B]/20 text-[#D9A21B] border border-[#D9A21B]/30">
-                        {tag}
-                      </span>
-                    ))}
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="text-sm font-bold text-white truncate">{lead.name}</h4>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20">
+                      {lead.source}
+                    </span>
                   </div>
-
-                  <div className="flex justify-between items-center mt-2 pt-4 border-t border-white/10">
+                  <p className="text-xs text-gray-500 mb-4">{lead.phone}</p>
+                  
+                  <div className="flex justify-between items-center pt-4 border-t border-white/5">
                     <span className="text-[10px] text-gray-500">
-                      {lead.updatedAt ? format(new Date(lead.updatedAt), "d 'de' MMM, h:mm a", { locale: es }) : 'Desconocido'}
+                      {lead.updated_at ? format(new Date(lead.updated_at), "d MMM, h:mm a", { locale: es }) : ''}
                     </span>
                     <select
-                      className="text-xs bg-black/40 border border-white/10 text-gray-300 rounded-lg py-1 pl-2 pr-6 outline-none focus:ring-1 focus:ring-[#D9A21B] appearance-none hover:bg-black/60 transition-colors"
+                      className="text-[10px] bg-black/40 border border-white/10 text-gray-300 rounded p-1"
                       value={lead.status}
                       onChange={(e) => handleStatusChange(lead.id, e.target.value)}
                     >
-                      {STATUSES.map(s => (
-                        <option key={s} value={s} className="bg-[#1a1a24]">
-                          {s === 'nuevo' ? 'Nuevo' : 
-                           s === 'asignado' ? 'Asignado' : 
-                           s === 'en_progreso' ? 'En Progreso' : 
-                           s === 'cerrado_ganado' ? 'Ganado' : 
-                           s === 'cerrado_perdido' ? 'Perdido' : 
-                           s.replace('_', ' ')}
-                        </option>
-                      ))}
+                      {STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
                     </select>
                   </div>
                 </motion.div>
@@ -243,49 +200,22 @@ export default function Leads() {
         ))}
       </div>
 
-      {/* Confirmation Modal */}
       <AnimatePresence>
         {confirmDelete && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel max-w-md w-full p-6 rounded-2xl shadow-2xl border border-white/10"
-            >
-              <div className="flex items-center gap-3 mb-4 text-red-400">
-                <AlertCircle className="h-6 w-6" />
-                <h3 className="text-xl font-bold text-white">Confirmar Eliminación</h3>
-              </div>
-              <p className="text-gray-300 mb-6">
-                {confirmDelete.type === 'lead' ? '¿Estás seguro de que deseas eliminar este prospecto? Esta acción no se puede deshacer.' :
-                 confirmDelete.type === 'messages' ? '¿Estás seguro de que deseas eliminar TODOS los mensajes y eventos? Los prospectos se mantendrán.' :
-                 '¡ATENCIÓN! Esta acción eliminará TODOS los prospectos, mensajes y eventos del sistema. ¿Estás absolutamente seguro?'}
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setConfirmDelete(null)}
-                  className="px-4 py-2 rounded-xl bg-white/5 text-gray-300 hover:bg-white/10 transition-all text-sm font-medium"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleConfirmDelete}
-                  className="px-4 py-2 rounded-xl bg-red-500 text-white hover:bg-red-600 transition-all text-sm font-medium shadow-lg shadow-red-500/20"
-                >
-                  Confirmar
-                </button>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9 }} animate={{ scale: 1 }} className="glass-panel p-8 rounded-3xl max-w-sm w-full border border-white/10">
+              <h3 className="text-xl font-bold text-white mb-4">Confirmar</h3>
+              <p className="text-gray-400 mb-8">¿Estás seguro de realizar esta acción?</p>
+              <div className="flex justify-end gap-4">
+                <button onClick={() => setConfirmDelete(null)} className="text-gray-500">Cancelar</button>
+                <button onClick={handleConfirmDelete} className="bg-red-500 px-6 py-2 rounded-xl text-white font-bold">Eliminar</button>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      <AddLeadModal 
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAdd={handleAddLead}
-      />
+      <AddLeadModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddLead} />
     </div>
   );
 }

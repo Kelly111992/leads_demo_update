@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { auth, db } from '../firebase';
-import { onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut, User as FirebaseUser } from 'firebase/auth';
-import { googleProvider } from '../firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { supabase } from '../supabase';
+import { User as SupabaseUser } from '@supabase/supabase-js';
 
 export type UserRole = 'admin' | 'agent';
 export type UserStatus = 'active' | 'inactive';
@@ -17,7 +15,7 @@ export interface UserProfile {
 }
 
 interface AuthContextType {
-  currentUser: FirebaseUser | null;
+  currentUser: SupabaseUser | null;
   userProfile: UserProfile | null;
   loading: boolean;
   signInWithGoogle: () => Promise<void>;
@@ -27,73 +25,94 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    // Check active sessions and sets the user
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user ?? null;
       setCurrentUser(user);
-      
-      if (!user) {
+      if (user) fetchProfile(user);
+      else {
         setUserProfile(null);
         setLoading(false);
-        return;
       }
-      
-      // We have a user, let's render the app immediately while we fetch the profile
-      setLoading(false);
-      
-      try {
-        const userRef = doc(db, 'users', user.uid);
-        const userSnap = await getDoc(userRef);
-        
-        if (userSnap.exists()) {
-          setUserProfile(userSnap.data() as UserProfile);
-        } else {
-          // Create new user profile
-          // Default to agent, unless it's the specific admin email
-          const isAdmin = user.email === 'arkelly147@gmail.com';
-          const newProfile: UserProfile = {
-            uid: user.uid,
-            name: user.displayName || 'Usuario Desconocido',
-            email: user.email || '',
-            role: isAdmin ? 'admin' : 'agent',
-            status: 'active',
-            createdAt: new Date().toISOString()
-          };
-          
-          try {
-            await setDoc(userRef, newProfile);
-            setUserProfile(newProfile);
-          } catch (error) {
-            console.error("Error creating user profile:", error);
-            // If creation fails (e.g., due to rules), we might just be an unauthorized user
-            // But we should still set the profile so the app doesn't hang!
-            setUserProfile(newProfile);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching user profile:", error);
-        // Fallback profile if we can't read from Firestore
+    });
+
+    // Listen for changes on auth state
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const user = session?.user ?? null;
+      setCurrentUser(user);
+      if (user) fetchProfile(user);
+      else {
+        setUserProfile(null);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function fetchProfile(user: SupabaseUser) {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('uid', user.id)
+        .single();
+
+      if (error && error.code === 'PGRST116') { // Not found
         const isAdmin = user.email === 'arkelly147@gmail.com';
-        setUserProfile({
-          uid: user.uid,
-          name: user.displayName || 'Usuario Desconocido',
+        const newProfile: UserProfile = {
+          uid: user.id,
+          name: user.user_metadata.full_name || user.user_metadata.name || 'Usuario Desconocido',
           email: user.email || '',
           role: isAdmin ? 'admin' : 'agent',
           status: 'active',
           createdAt: new Date().toISOString()
+        };
+
+        const { error: insertError } = await supabase
+          .from('users')
+          .insert([{
+            uid: newProfile.uid,
+            name: newProfile.name,
+            email: newProfile.email,
+            role: newProfile.role,
+            status: newProfile.status,
+            created_at: newProfile.createdAt
+          }]);
+
+        if (insertError) console.error("Error creating user profile:", insertError);
+        setUserProfile(newProfile);
+      } else if (data) {
+        setUserProfile({
+          uid: data.uid,
+          name: data.name,
+          email: data.email,
+          role: data.role,
+          status: data.status,
+          createdAt: data.created_at
         });
       }
-    });
-
-    return unsubscribe;
-  }, []);
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const signInWithGoogle = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+      if (error) throw error;
     } catch (error) {
       console.error("Error signing in with Google", error);
       throw error;
@@ -102,7 +121,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     try {
-      await firebaseSignOut(auth);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
     } catch (error) {
       console.error("Error signing out", error);
       throw error;
