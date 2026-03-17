@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles, UserCheck, X as XIcon } from 'lucide-react';
+import { Search, Send, MessageSquare, User, Bot, Loader2, PanelRightClose, PanelRightOpen, Trash2, Eraser, AlertCircle, ChevronDown, Sparkles, UserCheck, X as XIcon, Calendar, Clock, ClipboardCheck, Zap, Phone, Mail, Building2, History } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
@@ -253,6 +253,7 @@ export default function Inbox() {
 
       await supabase.from('leads').update({
         updated_at: now,
+        last_contact_at: now,
         status: 'en_progreso'
       }).eq('id', selectedLeadId);
 
@@ -533,107 +534,236 @@ export default function Inbox() {
           transition={{ duration: 0.2, ease: 'easeInOut' }}
           className="border-l border-white/10 bg-black/20 flex flex-col overflow-hidden flex-shrink-0"
         >
-          <div className="flex border-b border-white/10 flex-shrink-0">
-            <button onClick={() => setActiveTab('overview')} className={`flex-1 py-4 text-xs font-bold uppercase ${activeTab === 'overview' ? 'text-[#D9A21B] border-b-2 border-[#D9A21B]' : 'text-gray-500'}`}>Info</button>
-            <button onClick={() => setActiveTab('notes')} className={`flex-1 py-4 text-xs font-bold uppercase ${activeTab === 'notes' ? 'text-[#D9A21B] border-b-2 border-[#D9A21B]' : 'text-gray-500'}`}>Notas</button>
+          <div className="flex border-b border-white/10 flex-shrink-0 bg-white/5">
+            <button onClick={() => setActiveTab('overview')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'overview' ? 'text-[#D9A21B] border-b-2 border-[#D9A21B] bg-[#D9A21B]/5' : 'text-gray-500 hover:text-gray-300'}`}>Panel</button>
+            <button onClick={() => setActiveTab('profile')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'profile' ? 'text-[#D9A21B] border-b-2 border-[#D9A21B] bg-[#D9A21B]/5' : 'text-gray-500 hover:text-gray-300'}`}>Seguimiento</button>
+            <button onClick={() => setActiveTab('notes')} className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'notes' ? 'text-[#D9A21B] border-b-2 border-[#D9A21B] bg-[#D9A21B]/5' : 'text-gray-500 hover:text-gray-300'}`}>Notas</button>
           </div>
           <div className="p-5 space-y-5 overflow-y-auto flex-1" style={{ minWidth: 320 }}>
-            {/* VENDEDOR ASSIGNMENT - Premium Cards */}
-            <div>
-              <label className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-3">Asignar Vendedor</label>
-              <div className="space-y-2">
-                {agents.map(a => {
-                  const isAssigned = selectedLead.assignee_id === a.uid;
-                  return (
-                    <button
-                      key={a.uid}
-                      onClick={() => handleAssignAgent(isAssigned ? '' : a.uid)}
-                      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 text-left group ${
-                        isAssigned 
-                          ? 'bg-[#D9A21B]/15 border-[#D9A21B]/40 shadow-lg shadow-[#D9A21B]/10' 
-                          : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
-                      }`}
-                    >
-                      <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 overflow-hidden ${
-                        isAssigned 
-                          ? 'bg-[#D9A21B] text-black ring-2 ring-[#D9A21B]/50' 
-                          : 'bg-white/10 text-gray-400 group-hover:bg-white/20'
-                      }`}>
-                        {a.photo_url 
-                          ? <img src={a.photo_url} alt={a.name} className="h-full w-full object-cover" />
-                          : (a.name?.charAt(0) || 'V').toUpperCase()
-                        }
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold truncate ${isAssigned ? 'text-[#D9A21B]' : 'text-white'}`}>
-                          {a.name} {a.last_name || ''}
-                        </p>
-                        <p className="text-[10px] text-gray-500 truncate">{a.email || a.role}</p>
-                      </div>
-                      {isAssigned && (
-                        <UserCheck className="h-4 w-4 text-[#D9A21B] flex-shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
-                {selectedLead.assignee_id && (
-                  <button
-                    onClick={() => handleAssignAgent('')}
-                    className="w-full text-center py-2 text-[10px] text-gray-500 hover:text-red-400 transition-colors uppercase tracking-wider font-bold"
-                  >
-                    Quitar asignación
-                  </button>
-                )}
-              </div>
-            </div>
+            {activeTab === 'overview' && (
+              <div className="space-y-6">
+                {/* STATUS & SOURCE QUICK VIEW */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/5">
+                    <p className="text-[9px] text-gray-500 uppercase font-black mb-1">Estado</p>
+                    <p className="text-xs text-[#D9A21B] font-bold">{(selectedLead.status || 'nuevo').replace('_', ' ')}</p>
+                  </div>
+                  <div className="p-3 rounded-2xl bg-white/5 border border-white/5">
+                    <p className="text-[9px] text-gray-500 uppercase font-black mb-1">Fuente</p>
+                    <p className="text-xs text-white font-bold">{selectedLead.source || 'WhatsApp'}</p>
+                  </div>
+                </div>
 
-            {/* ETIQUETAS */}
-            <div>
-              <label className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-3">Etiquetas</label>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {selectedLead.tags?.map((t: string) => (
-                  <span key={t} className="px-2.5 py-1 rounded-lg bg-[#D9A21B]/15 text-[#D9A21B] text-[11px] font-medium flex items-center gap-1.5 border border-[#D9A21B]/20">
-                    {t}
-                    <button onClick={() => handleRemoveTag(t)} className="hover:text-red-400 transition-colors">
-                      <XIcon className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <input 
-                placeholder="Escribir etiqueta + Enter" 
-                onKeyDown={e => {
-                  if (e.key === 'Enter') {
-                    const val = (e.target as HTMLInputElement).value;
-                    handleAddTag(val);
-                    (e.target as HTMLInputElement).value = '';
-                  }
-                }}
-                className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-xs text-white outline-none focus:ring-1 focus:ring-[#D9A21B]/50 placeholder-gray-600"
-              />
-            </div>
+                {/* CRM SUMMARY */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <ClipboardCheck className="h-3.5 w-3.5 text-[#D9A21B]" />
+                    <label className="text-[10px] text-gray-300 uppercase font-black tracking-widest">Resumen del Cliente</label>
+                  </div>
+                  <textarea 
+                    value={selectedLead.summary || ''}
+                    onChange={(e) => handleUpdateLeadField('summary', e.target.value)}
+                    placeholder="Lo que busca el cliente, preferencias, cortes favoritos..."
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-[#D9A21B]/50 min-h-[100px] resize-none leading-relaxed"
+                  />
+                </div>
 
-            {/* LEAD INFO */}
-            <div>
-              <label className="block text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-3">Información</label>
-              <div className="space-y-2">
-                <div className="flex justify-between py-2 px-3 rounded-lg bg-white/5">
-                  <span className="text-[11px] text-gray-500">Teléfono</span>
-                  <span className="text-[11px] text-white font-medium">{selectedLead.phone}</span>
+                {/* NEXT STEPS */}
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap className="h-3.5 w-3.5 text-orange-400" />
+                    <label className="text-[10px] text-gray-300 uppercase font-black tracking-widest">Próximos Pasos</label>
+                  </div>
+                  <input 
+                    value={selectedLead.next_step || ''}
+                    onChange={(e) => handleUpdateLeadField('next_step', e.target.value)}
+                    placeholder="Ej: Enviar cotización de Ribeye lunes"
+                    className="w-full bg-white/5 border border-white/10 rounded-xl py-3 px-4 text-xs text-orange-400 font-medium outline-none focus:ring-1 focus:ring-orange-400/50"
+                  />
                 </div>
-                <div className="flex justify-between py-2 px-3 rounded-lg bg-white/5">
-                  <span className="text-[11px] text-gray-500">Estado</span>
-                  <span className="text-[11px] text-[#D9A21B] font-medium">{(selectedLead.status || 'nuevo').replace('_', ' ')}</span>
+
+                {/* ETIQUETAS */}
+                <div>
+                  <label className="block text-[10px] text-gray-500 uppercase font-black tracking-widest mb-3">Etiquetas de Canal</label>
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {selectedLead.tags?.map((t: string) => (
+                      <span key={t} className="px-2.5 py-1 rounded-lg bg-white/5 text-gray-400 text-[10px] font-bold flex items-center gap-1.5 border border-white/10">
+                        {t}
+                        <button onClick={() => handleRemoveTag(t)} className="hover:text-red-400 transition-colors">
+                          <XIcon className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                  <input 
+                    placeholder="+ Añadir etiqueta..." 
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const val = (e.target as HTMLInputElement).value;
+                        handleAddTag(val);
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }}
+                    className="w-full bg-transparent border-b border-white/10 py-2 text-[11px] text-white outline-none focus:border-[#D9A21B] transition-colors placeholder-gray-700"
+                  />
                 </div>
-                <div className="flex justify-between py-2 px-3 rounded-lg bg-white/5">
-                  <span className="text-[11px] text-gray-500">Fuente</span>
-                  <span className="text-[11px] text-white font-medium">{selectedLead.source || 'WhatsApp'}</span>
+
+                {/* AGENTE ASIGNADO */}
+                <div>
+                  <label className="block text-[10px] text-gray-400 uppercase font-black tracking-widest mb-3">Agente Responsable</label>
+                  <div className="space-y-2">
+                    {agents.map(a => {
+                      const isAssigned = selectedLead.assignee_id === a.uid;
+                      if (!isAssigned) return null;
+                      return (
+                        <div key={a.uid} className="flex items-center gap-3 p-3 rounded-2xl bg-[#D9A21B]/10 border border-[#D9A21B]/30">
+                          <div className="h-10 w-10 rounded-full overflow-hidden border-2 border-[#D9A21B]/30 bg-black/40">
+                            {a.photo_url ? <img src={a.photo_url} alt={a.name} className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center font-bold text-[#D9A21B]">{a.name.charAt(0)}</div>}
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs font-bold text-white">{a.name} {a.last_name || ''}</p>
+                            <p className="text-[10px] text-[#D9A21B]">Atendiendo ahora</p>
+                          </div>
+                          <button onClick={() => setIsAssignDropdownOpen(!isAssignDropdownOpen)} className="p-2 hover:bg-white/10 rounded-lg transition-colors text-gray-400">
+                             <ChevronDown className="h-4 w-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {!selectedLead.assignee_id && (
+                      <button onClick={() => setIsAssignDropdownOpen(true)} className="w-full py-4 border-2 border-dashed border-white/5 rounded-2xl text-[11px] text-gray-500 font-bold hover:bg-white/5 hover:border-white/10 transition-all">
+                        + Asignar a un Vendedor
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {activeTab === 'profile' && (
+              <div className="space-y-6">
+                <div>
+                   <h4 className="text-[10px] text-gray-500 uppercase font-black tracking-widest mb-4">Línea de Tiempo del Lead</h4>
+                   <div className="space-y-4">
+                      <div className="flex gap-3">
+                         <div className="w-8 flex flex-col items-center">
+                            <div className="h-6 w-6 rounded-full bg-emerald-500/20 flex items-center justify-center border border-emerald-500/30">
+                               <Calendar className="h-3 w-3 text-emerald-500" />
+                            </div>
+                            <div className="flex-1 w-0.5 bg-white/5 my-1" />
+                         </div>
+                         <div className="flex-1 pb-4">
+                            <p className="text-[11px] text-gray-200 font-bold">Primer Contacto</p>
+                            <p className="text-[10px] text-gray-500">{selectedLead.created_at ? format(new Date(selectedLead.created_at), "d 'de' MMMM, HH:mm", { locale: es }) : 'N/A'}</p>
+                         </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                         <div className="w-8 flex flex-col items-center">
+                            <div className="h-6 w-6 rounded-full bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
+                               <History className="h-3 w-3 text-blue-500" />
+                            </div>
+                            <div className="flex-1 w-0.5 bg-white/5 my-1" />
+                         </div>
+                         <div className="flex-1 pb-4">
+                            <p className="text-[11px] text-gray-200 font-bold">Último Mensaje Recibido</p>
+                            <p className="text-[10px] text-gray-500">{selectedLead.updated_at ? format(new Date(selectedLead.updated_at), "d 'de' MMMM, HH:mm", { locale: es }) : 'No hay mensajes aún'}</p>
+                         </div>
+                      </div>
+
+                      <div className="flex gap-3">
+                         <div className="w-8 flex flex-col items-center">
+                            <div className="h-6 w-6 rounded-full bg-orange-500/20 flex items-center justify-center border border-orange-500/30">
+                               <Phone className="h-3 w-3 text-orange-500" />
+                            </div>
+                         </div>
+                         <div className="flex-1">
+                            <p className="text-[11px] text-gray-200 font-bold">Contacto de Vendedor</p>
+                            <p className="text-[10px] text-gray-500">{selectedLead.last_contact_at ? format(new Date(selectedLead.last_contact_at), "d 'de' MMMM, HH:mm", { locale: es }) : 'Aún no contactado por agente'}</p>
+                         </div>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
+                   <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase">Nombre Completo</span>
+                      <span className="text-xs text-white font-medium">{selectedLead.name}</span>
+                   </div>
+                   <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-gray-500 font-bold uppercase">Teléfono</span>
+                      <span className="text-xs text-white font-medium">{selectedLead.phone}</span>
+                   </div>
+                   {selectedLead.company && (
+                     <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-gray-500 font-bold uppercase">Empresa</span>
+                        <span className="text-xs text-[#D9A21B] font-medium">{selectedLead.company}</span>
+                     </div>
+                   )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'notes' && (
+              <div className="h-full flex flex-col space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-[10px] text-gray-500 uppercase font-black tracking-widest">Bitácora de Notas</h4>
+                  <div className="h-1.5 w-1.5 rounded-full bg-[#D9A21B] shadow-[0_0_10px_#D9A21B]" />
+                </div>
+                <textarea 
+                  value={selectedLead.notes || ''}
+                  onChange={(e) => handleUpdateLeadField('notes', e.target.value)}
+                  placeholder="Añade detalles técnicos, pedidos especiales, quejas o cumplidos aquí..."
+                  className="flex-1 w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-gray-200 outline-none focus:ring-1 focus:ring-[#D9A21B]/50 resize-none leading-relaxed font-mono"
+                />
+              </div>
+            )}
           </div>
         </motion.div>
       )}
+      </AnimatePresence>
+
+      {/* AGENT ASSIGNMENT OVERLAY */}
+      <AnimatePresence>
+        {isAssignDropdownOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+             <motion.div 
+               initial={{ scale: 0.95, opacity: 0 }}
+               animate={{ scale: 1, opacity: 1 }}
+               exit={{ scale: 0.95, opacity: 0 }}
+               className="bg-[#111118] border border-white/10 rounded-3xl p-6 max-w-sm w-full shadow-2xl"
+             >
+                <div className="flex items-center justify-between mb-6">
+                   <h3 className="text-lg font-bold text-white">Cambiar Vendedor</h3>
+                   <button onClick={() => setIsAssignDropdownOpen(false)} className="text-gray-500 hover:text-white"><XIcon className="h-5 w-5" /></button>
+                </div>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                  {agents.map(a => {
+                    const isAssigned = selectedLead.assignee_id === a.uid;
+                    return (
+                      <button
+                        key={a.uid}
+                        onClick={() => { handleAssignAgent(a.uid); setIsAssignDropdownOpen(false); }}
+                        className={`w-full flex items-center gap-3 p-3 rounded-2xl border transition-all ${isAssigned ? 'bg-[#D9A21B]/20 border-[#D9A21B]/40' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
+                      >
+                         <div className="h-8 w-8 rounded-full overflow-hidden bg-black/40">
+                           {a.photo_url ? <img src={a.photo_url} alt={a.name} className="h-full w-full object-cover" /> : <div className="h-full w-full flex items-center justify-center text-xs font-bold text-[#D9A21B]">{a.name.charAt(0)}</div>}
+                         </div>
+                         <div className="flex-1 text-left">
+                            <p className="text-xs font-bold text-white">{a.name} {a.last_name || ''}</p>
+                            <p className="text-[10px] text-gray-500">{a.role}</p>
+                         </div>
+                         {isAssigned && <UserCheck className="h-4 w-4 text-[#D9A21B]" />}
+                      </button>
+                    )
+                  })}
+                  {selectedLead.assignee_id && (
+                    <button onClick={() => { handleAssignAgent(''); setIsAssignDropdownOpen(false); }} className="w-full py-3 text-[10px] text-red-400 font-black uppercase tracking-widest hover:bg-red-500/10 rounded-xl transition-all mt-4 border border-red-500/10">Quitar Asignación</button>
+                  )}
+                </div>
+             </motion.div>
+          </div>
+        )}
       </AnimatePresence>
 
       {/* Confirmation Modal */}
