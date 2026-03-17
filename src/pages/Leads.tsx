@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Plus, Search, Filter, Building2, DollarSign, AlertCircle } from 'lucide-react';
+import { Plus, Search, Filter, Building2, DollarSign, AlertCircle, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
@@ -16,6 +16,7 @@ export default function Leads() {
   const [searchTerm, setSearchTerm] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'lead' | 'messages' | 'system' } | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [agents, setAgents] = useState<any[]>([]);
 
   const fetchLeads = async () => {
     if (!userProfile) return;
@@ -34,8 +35,14 @@ export default function Leads() {
     setLoading(false);
   };
 
+  const fetchAgents = async () => {
+    const { data, error } = await supabase.from('profiles').select('*');
+    if (!error) setAgents(data || []);
+  };
+
   useEffect(() => {
     fetchLeads();
+    fetchAgents();
 
     const channel = supabase
       .channel('public:leads:kanban')
@@ -186,7 +193,16 @@ export default function Leads() {
                       {lead.source}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-500 mb-4">{lead.phone}</p>
+                  <p className="text-xs text-gray-400 mb-2">{lead.phone}</p>
+                  
+                  {lead.assignee_id && (
+                    <div className="flex items-center gap-1.5 mb-3 px-2 py-1 rounded bg-white/5 border border-white/5 w-fit">
+                      <User className="h-3 w-3 text-[#D9A21B]" />
+                      <span className="text-[10px] text-gray-300 font-medium">
+                        {agents.find(a => a.uid === lead.assignee_id)?.name || 'Vendedor'}
+                      </span>
+                    </div>
+                  )}
                   
                   <div className="flex justify-between items-center pt-4 border-t border-white/5">
                     <span className="text-[10px] text-gray-500">

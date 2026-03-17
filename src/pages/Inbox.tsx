@@ -396,7 +396,10 @@ export default function Inbox() {
                   </span>
                 </div>
                 {lead.assignee_id && (
-                  <span className="text-[10px] text-gray-500">Asignado</span>
+                  <span className="text-[10px] text-gray-400 font-medium flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
+                    <User className="h-3 w-3" />
+                    {agents.find(a => a.uid === lead.assignee_id)?.name || 'Asignado'}
+                  </span>
                 )}
               </div>
             </motion.div>
@@ -414,7 +417,15 @@ export default function Inbox() {
                   {(selectedLead.name || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-white">{selectedLead.name}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm font-semibold text-white">{selectedLead.name}</h2>
+                    {selectedLead.assignee_id && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-white/10 text-gray-300 border border-white/10 flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {agents.find(a => a.uid === selectedLead.assignee_id)?.name || 'Vendedor'}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-[#D9A21B]/80">{selectedLead.phone}</p>
                 </div>
               </div>
