@@ -12,7 +12,13 @@ async function check() {
   const snapshot = await getDocs(collection(db, 'webhook_events'));
   console.log('Total events:', snapshot.size);
   snapshot.forEach(doc => {
-    console.log(doc.id, doc.data().status, doc.data().createdAt);
+    console.log(doc.id, JSON.stringify(doc.data()));
+  });
+
+  const users = await getDocs(collection(db, 'users'));
+  console.log('Total users:', users.size);
+  users.forEach(doc => {
+    console.log(doc.id, JSON.stringify(doc.data()));
   });
 }
 

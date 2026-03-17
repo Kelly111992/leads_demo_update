@@ -35,8 +35,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
       
-      if (user) {
-        // Fetch or create user profile
+      if (!user) {
+        setUserProfile(null);
+        setLoading(false);
+        return;
+      }
+      
+      // We have a user, let's render the app immediately while we fetch the profile
+      setLoading(false);
+      
+      try {
         const userRef = doc(db, 'users', user.uid);
         const userSnap = await getDoc(userRef);
         
@@ -48,7 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const isAdmin = user.email === 'arkelly147@gmail.com';
           const newProfile: UserProfile = {
             uid: user.uid,
-            name: user.displayName || 'Unknown User',
+            name: user.displayName || 'Usuario Desconocido',
             email: user.email || '',
             role: isAdmin ? 'admin' : 'agent',
             status: 'active',
@@ -61,13 +69,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch (error) {
             console.error("Error creating user profile:", error);
             // If creation fails (e.g., due to rules), we might just be an unauthorized user
+            // But we should still set the profile so the app doesn't hang!
+            setUserProfile(newProfile);
           }
         }
-      } else {
-        setUserProfile(null);
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        // Fallback profile if we can't read from Firestore
+        const isAdmin = user.email === 'arkelly147@gmail.com';
+        setUserProfile({
+          uid: user.uid,
+          name: user.displayName || 'Usuario Desconocido',
+          email: user.email || '',
+          role: isAdmin ? 'admin' : 'agent',
+          status: 'active',
+          createdAt: new Date().toISOString()
+        });
       }
-      
-      setLoading(false);
     });
 
     return unsubscribe;

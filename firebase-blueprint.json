@@ -10,6 +10,8 @@
         "email": { "type": "string", "format": "email", "description": "The user's email address." },
         "role": { "type": "string", "enum": ["admin", "agent"], "description": "The user's role." },
         "status": { "type": "string", "enum": ["active", "inactive"], "description": "The user's status." },
+        "photoURL": { "type": "string", "description": "The user's photo URL." },
+        "bio": { "type": "string", "description": "User characteristics or biography." },
         "createdAt": { "type": "string", "format": "date-time", "description": "When the user was created." }
       },
       "required": ["uid", "name", "email", "role", "status", "createdAt"]
@@ -52,6 +54,21 @@
         "color": { "type": "string", "description": "The tag color (hex code or tailwind class)." }
       },
       "required": ["name", "color"]
+    },
+    "Vendor": {
+      "title": "Vendor",
+      "description": "A vendor that provides services.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "The vendor's name." },
+        "email": { "type": "string", "format": "email", "description": "The vendor's email address." },
+        "phone": { "type": "string", "description": "The vendor's phone number." },
+        "category": { "type": "string", "description": "The category of services provided." },
+        "photoURL": { "type": "string", "description": "The vendor's photo URL." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the vendor was created." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "When the vendor was last updated." }
+      },
+      "required": ["name", "createdAt"]
     }
   },
   "firestore": {
@@ -70,6 +87,10 @@
     "/tags/{tagId}": {
       "schema": { "$ref": "#/entities/Tag" },
       "description": "Stores available tags."
+    },
+    "/vendors/{vendorId}": {
+      "schema": { "$ref": "#/entities/Vendor" },
+      "description": "Stores vendor information."
     }
   }
 }

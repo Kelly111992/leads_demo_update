@@ -1,26 +1,63 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import fs from 'fs';
 import path from 'path';
 import SmeeClient from 'smee-client';
 
 // Load Firebase config
-const firebaseConfig = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), 'firebase-applet-config.json'), 'utf8'));
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+let firebaseConfig: any;
+try {
+  const configPath = path.resolve(process.cwd(), 'firebase-applet-config.json');
+  if (fs.existsSync(configPath)) {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    console.log('Firebase config loaded successfully');
+  } else {
+    console.error('CRITICAL: firebase-applet-config.json not found at', configPath);
+    // Fallback or exit? If it's critical, we might want to exit, 
+    // but let's try to continue to at least serve the static files if possible
+  }
+} catch (error) {
+  console.error('Error loading Firebase config:', error);
+}
+
+const firebaseApp = firebaseConfig ? initializeApp(firebaseConfig) : null;
+const db = firebaseApp ? getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId) : null;
+
+// Default Evolution API Config
+let EVOLUTION_URL = 'https://link-inmobiliario-evolution-api.hfsosq.easypanel.host';
+let INSTANCE = 'leads_test';
+let API_KEY = '429683C4C977415CAAFCCE10F7D57E11';
+
+async function fetchEvolutionConfig() {
+  if (!db) return;
+  try {
+    const docRef = doc(db, 'settings', 'evolution_api');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+      if (data.apiUrl) EVOLUTION_URL = data.apiUrl;
+      if (data.instance) INSTANCE = data.instance;
+      if (data.apiKey) API_KEY = data.apiKey;
+      console.log('Loaded Evolution API config from Firestore');
+    }
+  } catch (error) {
+    console.error('Error fetching Evolution API config:', error);
+  }
+}
 
 async function setupEvolutionWebhook() {
-  const EVOLUTION_URL = 'https://link-inmobiliario-evolution-api.hfsosq.easypanel.host';
-  const INSTANCE = 'leads_test';
-  const API_KEY = '429683C4C977415CAAFCCE10F7D57E11';
-  // Use APP_URL if available, otherwise fallback to the dev URL
-  const APP_URL = process.env.APP_URL || 'https://ais-pre-2xtjywkq6xgncjind7ujf7-85412012081.us-east1.run.app';
-  const webhookUrl = process.env.NODE_ENV !== "production"
-    ? 'https://smee.io/link-inmobiliario-dev-webhook'
-    : `${APP_URL}/api/webhook/evolution`;
+  if (!firebaseConfig) {
+    console.error('Skipping webhook setup: No Firebase config');
+    return;
+  }
+  await fetchEvolutionConfig();
+  
+  // Use Smee.io for more reliable webhook delivery in dev environment
+  const webhookUrl = 'https://smee.io/link-inmobiliario-dev-webhook';
 
+  console.log(`[DEBUG] process.env.APP_URL: ${process.env.APP_URL}`);
   console.log(`Configuring Evolution API Webhook to point to: ${webhookUrl}`);
 
   try {
@@ -45,7 +82,7 @@ async function setupEvolutionWebhook() {
         }
       })
     });
-
+    
     if (response.ok) {
       console.log('Evolution Webhook successfully configured!');
     } else {
@@ -81,91 +118,34 @@ async function startServer() {
     try {
       const payload = req.body || req.query;
       console.log(`Received webhook (${req.method}) from Evolution API:`, JSON.stringify(payload, null, 2));
-
+      
       recentWebhooks.unshift({ method: req.method, payload });
       if (recentWebhooks.length > 20) recentWebhooks.pop();
 
       // Check if it's a message upsert event
       if ((payload.event === 'messages.upsert' || payload.event === 'MESSAGES_UPSERT') && payload.data) {
-        const messageData = payload.data.message || payload.data;
-
-        // Process message logic directly on server
-        if (!messageData.key?.fromMe) {
-          const remoteJid = messageData.key?.remoteJid;
-          if (remoteJid && !remoteJid.includes('@g.us')) {
-            const phone = remoteJid.split('@')[0];
-            const pushName = messageData.pushName || phone;
-
-            let content = '';
-            if (messageData.message?.conversation) {
-              content = messageData.message.conversation;
-            } else if (messageData.message?.extendedTextMessage?.text) {
-              content = messageData.message.extendedTextMessage.text;
-            } else if (messageData.messageType === 'conversation' || messageData.messageType === 'extendedTextMessage') {
-              content = messageData.message?.text || messageData.text || '[Text Message]';
-            } else {
-              content = `[${messageData.messageType || 'Media/Unsupported Message'}]`;
-            }
-
-            console.log(`Processing message from ${pushName}: ${content}`);
-
-            // 1. Check if lead exists
-            const leadsRef = collection(db, 'leads');
-            const leadQuery = query(leadsRef, where('phone', '==', phone));
-            const querySnapshot = await getDocs(leadQuery);
-
-            let leadId = '';
-            const now = new Date().toISOString();
-
-            if (querySnapshot.empty) {
-              const newLead = {
-                name: pushName,
-                phone: phone,
-                source: 'whatsapp',
-                status: 'new',
-                createdAt: now,
-                updatedAt: now,
-                systemToken: 'claveai'
-              };
-              const docRef = await addDoc(leadsRef, newLead);
-              leadId = docRef.id;
-              console.log(`Created new lead: ${leadId}`);
-            } else {
-              const leadDoc = querySnapshot.docs[0];
-              leadId = leadDoc.id;
-              await updateDoc(doc(db, 'leads', leadId), {
-                updatedAt: now,
-                status: leadDoc.data().status === 'closed_won' || leadDoc.data().status === 'closed_lost' ? 'new' : leadDoc.data().status,
-                systemToken: 'claveai'
-              });
-              console.log(`Updated existing lead: ${leadId}`);
-            }
-
-            // 2. Save the message
-            const messagesRef = collection(db, 'messages');
-            await addDoc(messagesRef, {
-              leadId: leadId,
-              senderId: 'client',
-              content: content,
-              timestamp: now,
-              systemToken: 'claveai'
-            });
-            console.log(`Saved message for lead: ${leadId}`);
+        try {
+          if (!db) {
+            throw new Error('Firestore database not initialized');
           }
+          const eventsRef = collection(db, 'webhook_events');
+          await addDoc(eventsRef, {
+            payload: payload,
+            createdAt: new Date().toISOString(),
+            status: 'pending'
+          });
+          console.log('Saved webhook event for processing');
+          recentWebhooks[0].firestoreStatus = 'success';
+        } catch (fsError: any) {
+          console.error('Firestore Save Error:', fsError);
+          recentWebhooks[0].firestoreStatus = 'error';
+          recentWebhooks[0].firestoreError = fsError.message;
         }
-
-        const eventsRef = collection(db, 'webhook_events');
-        await addDoc(eventsRef, {
-          payload: payload,
-          createdAt: new Date().toISOString(),
-          status: 'processed'
-        });
-        console.log('✅ Webhook procesado y guardado en Firestore');
       }
 
       res.status(200).json({ status: 'success' });
     } catch (error) {
-      console.error('❌ Error procesando webhook:', error);
+      console.error('Error processing webhook:', error);
       res.status(500).json({ error: 'Internal Server Error' });
     }
   });
@@ -174,14 +154,12 @@ async function startServer() {
   server.post('/api/messages/send', async (req, res) => {
     try {
       const { phone, text } = req.body;
-
+      
       if (!phone || !text) {
         return res.status(400).json({ error: 'Phone and text are required' });
       }
 
-      const EVOLUTION_URL = 'https://link-inmobiliario-evolution-api.hfsosq.easypanel.host';
-      const INSTANCE = 'leads_test';
-      const API_KEY = '429683C4C977415CAAFCCE10F7D57E11';
+      await fetchEvolutionConfig();
 
       const response = await fetch(`${EVOLUTION_URL}/message/sendText/${INSTANCE}`, {
         method: 'POST',
@@ -191,12 +169,11 @@ async function startServer() {
         },
         body: JSON.stringify({
           number: phone,
+          text: text,
           options: {
             delay: 0,
-            presence: "composing"
-          },
-          textMessage: {
-            text: text
+            presence: "composing",
+            linkPreview: false
           }
         })
       });
@@ -207,7 +184,11 @@ async function startServer() {
         return res.status(response.status).json({ error: 'Failed to send message via Evolution API' });
       }
 
-      res.status(200).json({ status: 'success' });
+      const data = await response.json();
+      res.status(200).json({ 
+        status: 'success', 
+        evolutionId: data.key?.id || data.id || (data.message && data.message.key && data.message.key.id)
+      });
     } catch (error) {
       console.error('Error sending message:', error);
       res.status(500).json({ error: 'Internal Server Error' });
@@ -216,13 +197,29 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    console.log('Starting in DEVELOPMENT mode');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     server.use(vite.middlewares);
   } else {
+    console.log('Starting in PRODUCTION mode');
     const distPath = path.join(process.cwd(), 'dist');
+    console.log('Serving static files from:', distPath);
+    
+    if (fs.existsSync(distPath)) {
+      console.log('Dist folder exists');
+      const indexHtml = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexHtml)) {
+        console.log('index.html found');
+      } else {
+        console.error('CRITICAL: index.html NOT found in dist folder');
+      }
+    } else {
+      console.error('CRITICAL: dist folder NOT found. Did you run npm run build?');
+    }
+
     server.use(express.static(distPath));
     server.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
@@ -231,7 +228,7 @@ async function startServer() {
 
   server.listen(PORT, "0.0.0.0", async () => {
     console.log(`Server running on http://localhost:${PORT}`);
-
+    
     // Automatically configure the webhook on startup
     await setupEvolutionWebhook();
 
