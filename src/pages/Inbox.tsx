@@ -427,8 +427,10 @@ export default function Inbox() {
         await supabase.from('leads').delete().eq('system_token', 'claveai');
         await supabase.from('messages').delete().eq('system_token', 'claveai');
         await supabase.from('webhook_events').delete().eq('system_token', 'claveai');
+        setSelectedLeadId(null);
       }
       setConfirmDelete(null);
+      await fetchLeads();
     } catch (error) {
       console.error("Error in delete operation:", error);
       setConfirmDelete(null);
@@ -459,8 +461,8 @@ export default function Inbox() {
               </button>
               {userProfile?.role === 'admin' && (
                 <button
-                  onClick={() => setConfirmDelete({ id: 'all', type: 'messages' })}
-                  title="Limpiar"
+                  onClick={() => setConfirmDelete({ id: 'all', type: 'system' })}
+                  title="Eliminar Todas"
                   className="inline-flex items-center justify-center h-8 w-8 rounded-xl bg-red-500/10 text-red-500 border border-red-500/20 hover:bg-red-500/20 transition-all shadow-lg"
                 >
                   <Eraser className="h-4 w-4" />
