@@ -33,7 +33,7 @@ export default function Inbox() {
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'lead' | 'message' | 'messages' | 'system' } | null>(null);
 
   useEffect(() => {
-    setIsTyping(!!newMessage.trim());
+    setIsTyping(!!String(newMessage || '').trim());
   }, [newMessage]);
 
   useEffect(() => {
@@ -205,9 +205,8 @@ export default function Inbox() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !selectedLeadId || !userProfile) return;
-
-    const msgText = newMessage.trim();
+    const msgText = String(newMessage || '').trim();
+    if (!msgText || !selectedLeadId || !userProfile) return;
     setNewMessage('');
     setIsAiPopulated(false);
     
@@ -453,7 +452,7 @@ export default function Inbox() {
               {isAiEnabled && !isGeneratingAi && aiSuggestions.length > 0 && (
                 <div className="flex gap-2 overflow-x-auto mb-3 pb-1">
                   {aiSuggestions.map((s, i) => (
-                    <button key={i} onClick={() => setNewMessage(s)} className="px-3 py-1.5 rounded-lg text-xs bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 whitespace-nowrap">
+                    <button key={i} onClick={() => setNewMessage(String(s || ''))} className="px-3 py-1.5 rounded-lg text-xs bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 whitespace-nowrap">
                       {s}
                     </button>
                   ))}
