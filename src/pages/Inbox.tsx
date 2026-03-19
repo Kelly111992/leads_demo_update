@@ -37,6 +37,9 @@ export default function Inbox() {
   const [isNewChatModalOpen, setIsNewChatModalOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'lead' | 'message' | 'messages' | 'system' } | null>(null);
   const [quickTemplates, setQuickTemplates] = useState<any[]>([]);
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const [templateFilter, setTemplateFilter] = useState('');
+  const [selectedTemplateIndex, setSelectedTemplateIndex] = useState(0);
 
   // Fetch user-defined templates from Supabase
   useEffect(() => {
@@ -46,6 +49,55 @@ export default function Inbox() {
     };
     loadTemplates();
   }, []);
+
+  const filteredTemplates = quickTemplates.filter(t => 
+    t.label.toLowerCase().includes(templateFilter.toLowerCase())
+  );
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setNewMessage(val);
+
+    const lastSlashIndex = val.lastIndexOf('/');
+    if (lastSlashIndex !== -1 && lastSlashIndex === val.length - 1) {
+      setShowTemplateMenu(true);
+      setTemplateFilter('');
+      setSelectedTemplateIndex(0);
+    } else if (lastSlashIndex !== -1 && showTemplateMenu) {
+      const filter = val.substring(lastSlashIndex + 1);
+      if (filter.includes(' ')) {
+        setShowTemplateMenu(false);
+      } else {
+        setTemplateFilter(filter);
+      }
+    } else {
+      setShowTemplateMenu(false);
+    }
+  };
+
+  const selectTemplate = (template: any) => {
+    const lastSlashIndex = newMessage.lastIndexOf('/');
+    const beforeSlash = newMessage.substring(0, lastSlashIndex);
+    setNewMessage(beforeSlash + template.content);
+    setShowTemplateMenu(false);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent) => {
+    if (showTemplateMenu && filteredTemplates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedTemplateIndex(prev => (prev + 1) % filteredTemplates.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedTemplateIndex(prev => (prev - 1 + filteredTemplates.length) % filteredTemplates.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        selectTemplate(filteredTemplates[selectedTemplateIndex]);
+      } else if (e.key === 'Escape') {
+        setShowTemplateMenu(false);
+      }
+    }
+  };
 
   useEffect(() => {
     setIsTyping(!!String(newMessage || '').trim());
@@ -625,47 +677,63 @@ export default function Inbox() {
               <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-4 bg-black/20 border-t border-white/10">
-              {isGeneratingAi && (
-                <div className="text-xs text-[#D9A21B] flex items-center gap-2 mb-3">
-                  <Loader2 className="h-3 w-3 animate-spin"/> Leyendo contexto de la conversación...
-                </div>
-              )}
-              {/* AI Suggestions (when Copilot ON) */}
-              {isAiEnabled && !isGeneratingAi && aiSuggestions.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto mb-3 pb-1 no-scrollbar">
-                  {aiSuggestions.map((s, i) => (
-                    <button key={i} onClick={() => setNewMessage(String(s || ''))} className="px-3 py-1.5 rounded-lg text-[10px] bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 whitespace-nowrap hover:bg-[#D9A21B]/20 transition-all">
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {/* Dynamic Templates (when Copilot OFF) */}
-              {!isAiEnabled && quickTemplates.length > 0 && (
-                <div className="mb-3">
-                  <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest mb-2">Plantillas Rápidas</p>
-                  <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar flex-wrap">
-                    {quickTemplates.map(t => (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => setNewMessage(t.content)}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] bg-${t.color}-500/10 text-${t.color}-400 border border-${t.color}-500/20 whitespace-nowrap font-bold flex items-center gap-1 hover:bg-${t.color}-500/20 transition-all`}
-                      >
-                        <MessageSquare className="h-3 w-3" /> {t.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <form onSubmit={handleSendMessage} className="flex gap-2">
-                <input 
-                  value={newMessage}
-                  onChange={e => setNewMessage(e.target.value)}
-                  placeholder="Escribe un mensaje..."
-                  className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#D9A21B]/50"
-                />
+             <div className="p-4 bg-black/20 border-t border-white/10 relative">
+               {isGeneratingAi && (
+                 <div className="text-xs text-[#D9A21B] flex items-center gap-2 mb-3">
+                   <Loader2 className="h-3 w-3 animate-spin"/> Leyendo contexto de la conversación...
+                 </div>
+               )}
+               {/* AI Suggestions (when Copilot ON) */}
+               {isAiEnabled && !isGeneratingAi && aiSuggestions.length > 0 && (
+                 <div className="flex gap-2 overflow-x-auto mb-3 pb-1 no-scrollbar">
+                   {aiSuggestions.map((s, i) => (
+                     <button key={i} onClick={() => setNewMessage(String(s || ''))} className="px-3 py-1.5 rounded-lg text-[10px] bg-[#D9A21B]/10 text-[#D9A21B] border border-[#D9A21B]/20 whitespace-nowrap hover:bg-[#D9A21B]/20 transition-all">
+                       {s}
+                     </button>
+                   ))}
+                 </div>
+               )}
+
+               {/* Slash Menu for Templates */}
+               <AnimatePresence>
+                 {showTemplateMenu && filteredTemplates.length > 0 && (
+                   <motion.div 
+                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                     animate={{ opacity: 1, y: 0, scale: 1 }}
+                     exit={{ opacity: 0, scale: 0.95 }}
+                     className="absolute bottom-full left-4 mb-2 w-72 max-h-60 overflow-y-auto bg-[#1A1A1A] border border-white/10 rounded-2xl shadow-2xl z-50 flex flex-col p-2 glass-panel"
+                   >
+                     <div className="px-2 py-2 border-b border-white/5 mb-1">
+                        <p className="text-[9px] text-gray-500 uppercase font-black tracking-widest">Plantillas Rápidas</p>
+                     </div>
+                     {filteredTemplates.map((t, i) => (
+                       <button
+                         key={t.id}
+                         onClick={() => selectTemplate(t)}
+                         onMouseEnter={() => setSelectedTemplateIndex(i)}
+                         className={`w-full text-left p-3 rounded-xl transition-all flex items-start gap-3 group ${i === selectedTemplateIndex ? 'bg-[#D9A21B]/10 border border-[#D9A21B]/30' : 'hover:bg-white/5 border border-transparent'}`}
+                       >
+                         <div className={`h-8 w-8 rounded-lg bg-${t.color}-500/20 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform`}>
+                            <MessageSquare className={`h-4 w-4 text-${t.color}-400`} />
+                         </div>
+                         <div className="flex-1 min-w-0">
+                           <p className={`text-xs font-bold ${i === selectedTemplateIndex ? 'text-[#D9A21B]' : 'text-white'}`}>{t.label}</p>
+                           <p className="text-[10px] text-gray-400 truncate mt-0.5">{t.content}</p>
+                         </div>
+                       </button>
+                     ))}
+                   </motion.div>
+                 )}
+               </AnimatePresence>
+
+               <form onSubmit={handleSendMessage} className="flex gap-2">
+                 <input 
+                   value={newMessage}
+                   onChange={handleInputChange}
+                   onKeyDown={handleInputKeyDown}
+                   placeholder="Escribe un mensaje o usa / para plantillas..."
+                   className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#D9A21B]/50"
+                 />
                 <button type="submit" className="h-10 w-10 bg-[#D9A21B] rounded-xl flex items-center justify-center text-black">
                   <Send className="h-4 w-4" />
                 </button>
