@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { motion, AnimatePresence } from 'motion/react';
 import { AddLeadModal } from '../components/AddLeadModal';
+import { EditLeadModal } from '../components/EditLeadModal';
 
 const STATUSES = ['nuevo', 'asignado', 'en_progreso', 'cerrado_ganado', 'cerrado_perdido'];
 
@@ -17,6 +18,8 @@ export default function Leads() {
   const [confirmDelete, setConfirmDelete] = useState<{ id: string, type: 'lead' | 'messages' | 'system' } | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [agents, setAgents] = useState<any[]>([]);
+  const [selectedLeadToEdit, setSelectedLeadToEdit] = useState<any>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   const fetchLeads = async () => {
     if (!userProfile) return;
@@ -127,6 +130,10 @@ export default function Leads() {
     }
   };
 
+  const handleUpdateLead = (updatedLead: any) => {
+    setLeads(prev => prev.map(l => l.id === updatedLead.id ? updatedLead : l));
+  };
+
   const filteredLeads = leads.filter(lead => 
     lead.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.phone?.includes(searchTerm)
@@ -185,7 +192,11 @@ export default function Leads() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.05 }}
                   key={lead.id} 
-                  className="bg-white/5 border border-white/10 p-5 rounded-xl hover:bg-white/10 transition-all cursor-pointer"
+                  onClick={() => {
+                    setSelectedLeadToEdit(lead);
+                    setIsEditModalOpen(true);
+                  }}
+                  className="bg-white/5 border border-white/10 p-5 rounded-xl hover:bg-white/10 transition-all cursor-pointer group hover:shadow-xl hover:shadow-[#D9A21B]/5"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <h4 className="text-sm font-bold text-white truncate">{lead.name}</h4>
@@ -247,6 +258,14 @@ export default function Leads() {
       </AnimatePresence>
 
       <AddLeadModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddLead} />
+      
+      <EditLeadModal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        lead={selectedLeadToEdit} 
+        onUpdate={handleUpdateLead}
+        agents={agents}
+      />
     </div>
   );
 }
